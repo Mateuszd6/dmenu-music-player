@@ -1,26 +1,12 @@
-#ifndef QUEUE_H
-#define QUEUE_H
-
 #include <malloc.h>
 #include <assert.h>
 #include <string.h>
 
-struct QueueNode
-{
-    char *value;
-    struct QueueNode *next;
-};
-
-struct Queue
-{
-    struct QueueNode *head, *tail;
-};
-
-struct Queue *track_queue;
+#include "track_queue.h"
 
 struct Queue *InitializeQueue()
 {
-    struct Queue *res = (struct Queue *)malloc(sizeof(struct Queue));
+    struct Queue *res = malloc(sizeof(struct Queue));
     res->head = NULL;
     res->tail = NULL;
     return res;
@@ -39,16 +25,16 @@ void DestroyQueue(struct Queue *queue)
 
 int EmptyQueue(struct Queue *queue)
 {
-    assert(queue->tail != NULL || queue->head == NULL);
     // queue->tail == NULL  =>  queue->head == NULL
+    assert(queue->tail != NULL || queue->head == NULL);
 
     return (queue->tail == NULL);
 }
 
 char *Peek(struct Queue *queue)
 {
-    assert(queue->tail != NULL || queue->head == NULL);
     // queue->tail == NULL  =>  queue->head == NULL
+    assert(queue->tail != NULL || queue->head == NULL);
 
     if (queue->head == NULL)
         return NULL;
@@ -61,11 +47,10 @@ char *Peek(struct Queue *queue)
 
 void Enqueue (struct Queue *queue, char *value)
 {
-    struct QueueNode *last = 
-        (struct QueueNode *)malloc(sizeof(struct QueueNode));
+    struct QueueNode *last = malloc(sizeof(struct QueueNode));
 
     int len = strlen(value);
-    last->value = (char *)malloc((len + 1) * sizeof(char));
+    last->value = malloc((len + 1) * sizeof(char));
     memcpy(last->value, value, len);
     last->value[len] = '\0';
 
@@ -96,11 +81,7 @@ void Dequeue (struct Queue *queue)
             queue->tail = NULL;
         }
         else
-        {
             queue->head = first->next;
-        }
         free(first);
     }
 }
-
-#endif  

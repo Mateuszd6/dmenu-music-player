@@ -9,13 +9,14 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 
 #include <bass.h>
 
-#include "queue.h"
+#include "track_queue.h"
 #include "music_data.h"
-// TODO: sure include C file?
-#include "music_library.c"
+#include "music_library.h"
+#include "menu.h"
 
 // TODO: Make nice messages system.
 const int MSG_QUIT = 1 << 2;
@@ -36,19 +37,23 @@ int InitPlayer()
 
 int InitPipe(int *fd)
 {
-    // TODO: IMPORTANT: CLEAR THE PIPE, coz it is possible
-    //                  to send lot of messages while player
-    //                  is inactive.
     char *myfifo = "/tmp/my-fifo-pipe";
-    if (!mkfifo(myfifo, S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH))
+
+    // If this file already exist delete it first.
+    if(access(myfifo, F_OK) != -1) 
     {
-        // TODO: The program should be able to run without pipe messages.
+        // TODO: Handle the case when program cannot remove this file.
+        unlink(myfifo);
+    }
+
+    if (mkfifo(myfifo, S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) != 0)
+    {
+        // TODO: Should the program be able to run without pipe messages?
         printf("Couldn't make fifo pipe.\n");
         return 0;
     }
 
     (* fd) = open(myfifo, O_RDONLY | O_NONBLOCK);
-
     if ((* fd) < 0)
     {
         // TODO: The program should be able to run without pipe messages.
@@ -151,11 +156,9 @@ int ProcessMessage(int fd, char *buffer)
     {
         if (strncmp(buffer, "player-queue\n", read_res) == 0)
         {
-                Enqueue(track_queue, "/home/mateusz/Music/Eluveitie/Origins\
-/12 King.mp3");
+            // TODO: What here?
         }
-        else if (strncmp(buffer, "player-toggle-pause\n",
-            read_res) == 0)
+        else if (strncmp(buffer, "player-toggle-pause\n", read_res) == 0)
         {
             printf("Toggling pause...\n");
             ToggleMusic();
@@ -168,7 +171,6 @@ int ProcessMessage(int fd, char *buffer)
         // TODO: Call dmenu via bash or shortcut.
         else if (strncmp(buffer, "menu-show\n", read_res) == 0)
         {
-            printf("Showing menu:\n");
             CallMenu();
         }
         else if (strncmp(buffer, "menu-pick", strlen("menu-pick")) == 0)
@@ -177,8 +179,7 @@ int ProcessMessage(int fd, char *buffer)
         }
         else
         {
-            printf("Received unrecognized message: %.*s\n", read_res,
-                buffer);
+            printf("Received unrecognized message: %.*s\n", read_res, buffer);
         }
         // TODO: Change to action code?
         return 0;
@@ -192,12 +193,19 @@ int ProcessMessage(int fd, char *buffer)
 
 int main(void)
 {
-    menu_curr_state = MENU_STATE_ARTISTS;
+    // TODO: Specify lock_file dir? Or use relative path?
+    int fi = open("./locked_file", O_CREAT);
 
-    printf("Hello world..!\n");
-
+    // TODO: Should the music player be able to run without lockfile?
+    if (fi == -1 || flock(fi, LOCK_EX) != 0) 
+    {
+        printf("Error opening lock file. Exitting...");
+        return 255;
+    }    
 
     db = CreateMusicDB();
+
+    menu_curr_state = MENU_STATE_ARTISTS;
     CallMenu();
 
     track_queue = InitializeQueue();
@@ -208,14 +216,13 @@ int main(void)
     // Handler to a pipe file and buffer for the messages.
     int fd;
 
-    // TODO: Which way is better? There should be set a max size for the msg.
     // Buffer for messages comming from pipe.
     char buffer[1 << 7];
 
     if (!InitPipe(& fd))
         return -1;
+
     // TODO: TEMP!
-    // LoadAndPlayMusic("/home/mateusz/Music/Eluveitie/Origins/12 King.mp3");
     LoadAndPlayMusic("/home/mateusz/Music/guitar.mp3");
 
     // The main loop to handle the incomming messages.
@@ -223,9 +230,8 @@ int main(void)
     {
         if (ProcessMessage(fd, buffer) == MSG_QUIT)
             break;
-        usleep(1000 * 500);
-        // printf ("%lu\n", BASS_ChannelGetPosition(channel, BASS_POS_BYTE));
-        // printf ("%lu\n", BASS_ChannelGetLength(channel, BASS_POS_BYTE));
+
+        usleep(1000 * 100);
 
         // Track has finished. Need to load another track from the queue.
         if (BASS_ChannelIsActive(channel) == 0)

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# This is a frontend script to the player. Recieving different command it 
+# can start menu, restart player, display the queue, and query the current track
+
+if [ $# -eq 0 ]; then
+    echo "TODO: SHOW HELP"
+    exit 1    
+fi
+
+verbose=0
+
+case "$1" in 
+    menu)
+        # TODO: Open menu. Start dmenu-music-player if needed (check the lockfile).
+        if [ -z "`lslocks | grep /home/mateusz/work/dmenu-music-player/locked_file`" ]; then
+            # It means player is not working yet. Start it immediately.
+            echo "DEBUG: There is no lock, starting daemon..."
+            ~/work/dmenu-music-player/program &
+        else
+            # Player is already running. Send a message that menu is requested.
+            echo "DEBUG: There is lock."
+	        echo "menu-show" > /tmp/my-fifo-pipe
+        fi
+        ;;
+    track)
+        echo "TODO: Show current track: (NOTE: formatting is on the way)."
+        ;;
+    *)
+        echo "TODO: SHOW HELP"
+        exit 1
+    esac        

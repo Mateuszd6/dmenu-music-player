@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <string.h>
-#include <pthread.h>
 
-#include "music_library.h"
+#include "misc.h"
 #include "music_data.h"
-#include "queue.h"
+#include "music_library.h"
+#include "track_queue.h"
 
+// TODO: Use some normal format like xml, 
+//       not plain ASCII characters.
 const char SIGN_ARTIST = '\001';
 const char SIGN_ALBUM_TITLE = '\002';
 const char SIGN_SONG_TITLE = '\003';
@@ -25,49 +27,9 @@ int menu_curr_artist = 0;
 int menu_curr_album = 0;
 
 const char *UNKNOW_NAME = "<unknow>";
-const char *prefix = "echo -e \"";
-const char *suffix = "\" | dmenu -i";
 
-struct MusicDatabase db;
-
-struct AlbumInfo
-{
-    // These are titles displayed in the menu.
-    char *title;
-    // Tracks (title + 'SIGN_SONG_PATH' + path).
-    char **tracks;
-    // Length of both arrays.
-    int length;
-};
-
-struct ArtistInfo 
-{
-    char *name;
-    // All albums of the artist.
-    struct AlbumInfo *albums;
-    // Number of albums.
-    int length;
-};
-
-struct MusicDatabase
-{
-    int length;
-
-    struct ArtistInfo *artists;
-};
-
-int CompareStrings(const char *self, const char *other)
-{
-    if (self == NULL && other == NULL)
-        return 0;
-    else if (self == NULL)
-        return 1;
-    else if (other == NULL)
-        return -1;
-    else
-        return strcmp(self, other);
-}
-
+// Used to sort music data. 
+// TODO: Allow different user configurations?
 int CompareMusicData(const void *self, const void *other)
 {
     char ***elem1 = (char ***)self;
@@ -86,20 +48,20 @@ int CompareMusicData(const void *self, const void *other)
             return cmp_album;
         else
         {
-            int left_idx = 0, right_idx = 0;
-            while ((unsigned int)left_idx < strlen((* elem1)[DATA_TRACK])
+            unsigned int left_idx = 0, right_idx = 0;
+            while (left_idx < strlen((* elem1)[DATA_TRACK])
             && '0' <= (* elem1)[DATA_TRACK][left_idx]
             && (* elem1)[DATA_TRACK][left_idx] <= '9')
                 left_idx++;
 
-            while ((unsigned int)right_idx < strlen((* elem2)[DATA_TRACK])
+            while (right_idx < strlen((* elem2)[DATA_TRACK])
             && '0' <= (* elem2)[DATA_TRACK][right_idx]
             && (* elem2)[DATA_TRACK][right_idx] <= '9')
                 right_idx++;
 
             if (left_idx == right_idx)
             {
-                int cmp_tracks = strncmp(
+                int cmp_tracks = strncmp( 
                     (* elem1)[DATA_TRACK],
                     (* elem2)[DATA_TRACK],
                     left_idx <= right_idx ? left_idx : right_idx);
@@ -116,6 +78,9 @@ int CompareMusicData(const void *self, const void *other)
     }
 }
 
+// Recursive funtion used to find all music files within a directory.
+// [name] is a cwd, TODO: remove indent, [arr] is an array to be filled 
+// with data and [idx] in an index at which funtion writes to the [arr].
 void listdir(const char *name, int indent, char ***arr, int* idx)
 {
     DIR *dir;
@@ -160,6 +125,9 @@ void listdir(const char *name, int indent, char ***arr, int* idx)
     return;
 }
 
+// TODO: Get rid of this copypaste!
+
+// List all artist from the music database [db].
 char *ListArtists()
 {
     // TODO: realloc for more characters.
@@ -183,6 +151,7 @@ char *ListArtists()
     return strdup(res);
 }
 
+// List all albubs of the given artist. 
 char *ListAlbums(struct ArtistInfo artistInfo)
 {
     // TODO: realloc for more characters.
@@ -207,6 +176,7 @@ char *ListAlbums(struct ArtistInfo artistInfo)
     return strdup(res);
 }
 
+// List all tracks from the given album.
 char *ListTracks(struct AlbumInfo albumInfo)
 {
     // TODO: realloc for more characters.
@@ -215,7 +185,6 @@ char *ListTracks(struct AlbumInfo albumInfo)
     
     for (int i = 0; i < albumInfo.length; ++i)
     {
-#if 1
         for (int j = 0; 
             j < strchr(albumInfo.tracks[i],SIGN_SONG_PATH)-albumInfo.tracks[i];
             ++j)
@@ -228,7 +197,6 @@ char *ListTracks(struct AlbumInfo albumInfo)
             res[idx++] = '\\';
             res[idx++] = 'n';
         }
-#endif
         printf("%s\n", albumInfo.tracks[i]);
     }
 
@@ -236,193 +204,21 @@ char *ListTracks(struct AlbumInfo albumInfo)
     return strdup(res);
 }
 
-// This is a thread which is called when menu is shown.
-// Menu is handed separately, because it cannot block playing the music.
-pthread_t menu_thread;
-
-// Is menu currently running? If so there is no point in starting another
-// process and CallMenu won't start dmenu.
-int menu_is_running = 0;
-
-void ShowMenu()
-{
-    char buf[1 << 14];
-    int buf_idx = 0;
-    char *msg_content;
-
-    // TODO: Choose which function to call and generate content based on
-    // menu state.
-    if (menu_curr_state == MENU_STATE_ARTISTS)
-        msg_content = ListArtists();        
-    else if (menu_curr_state == MENU_STATE_ALBUMS)
-        msg_content = ListAlbums((db.artists)[menu_curr_artist]);
-    else if (menu_curr_state == MENU_STATE_TRACKS)
-        msg_content = ListTracks((db.artists)[menu_curr_artist].albums[
-            menu_curr_album]);
-    else
-    {
-        printf("Unexpected menu state: %d\n", menu_curr_state);
-        return;
-    }
-
-    // TODO: One function to do this (for each of these)!
-    for (unsigned int i = 0; i < strlen(prefix); ++i)    
-        buf[buf_idx++] = prefix[i];
-    for (unsigned int i = 0; i < strlen(msg_content); ++i)    
-        buf[buf_idx++] = msg_content[i];
-    for (unsigned int i = 0; i < strlen(suffix); ++i)    
-        buf[buf_idx++] = suffix[i];    
-
-    buf[buf_idx] = '\0';
-
-    if (msg_content != NULL)
-    {
-        free(msg_content);
-        msg_content = NULL;
-    }
-
-    // The pipe used to read dmenu's output.
-    FILE *dmenu_pipe;
-    char output_buff[1024];
-
-    // Execute command stored in buffer and use pipe to read it's output.
-    dmenu_pipe = popen(buf, "r");
-    if (dmenu_pipe == NULL) 
-    {
-        printf("Failed to run command\n" );
-        exit(1);
-    }
-
-#if 0 //??
-    printf("OUTPUT:\n");
-#endif
-
-    // Dmenu should procude one line of output, so the rest is ignored.
-    if (fgets(output_buff, sizeof(output_buff)-1, dmenu_pipe) == NULL) 
-    {
-        printf("No DMENU output!\n");
-        pclose(dmenu_pipe);
-        return;
-    }
-
-    pclose(dmenu_pipe);
-    HandleDmenuOutput(output_buff);
-}
-
-void *StartMenuThread(void *args)
-{
-    ShowMenu();
-    menu_is_running = 0;
-
-    printf("\x1b[32mMenu thread terminates.\x1b[0m\n");
-    return NULL;
-}
-
-void CallMenu()
-{
-    if (menu_is_running)
-    {
-        // TODO: Or mayby terminate former menu and call new one?
-        printf("MENU_IS_ALREADY_RUNNING!\n");
-        return;
-    }
-    menu_is_running = 1;
-
-    pthread_create(&menu_thread, NULL, StartMenuThread, NULL);
-}
-
-void HandleDmenuOutput(const char *output)
-{
-    printf("MENU STATE: %d\n", menu_curr_state);
-
-    if (menu_curr_state == MENU_STATE_ARTISTS)
-    {
-        menu_curr_artist = -1;
-        for (int i = 0; i < db.length; ++i)
-        {
-            printf("%d: %s\n", i, (db.artists)[i].name);
-            if (strncmp((db.artists)[i].name, output, 
-                strlen((db.artists)[i].name)) == 0)
-            {
-                menu_curr_artist = i;
-                break;
-            }
-        }        
-        if (menu_curr_artist >= 0)
-        {
-            menu_curr_state = MENU_STATE_ALBUMS;
-            ShowMenu();
-        }
-        else
-        {
-            printf("No artist found!\n");
-            menu_curr_state = MENU_STATE_MAIN;
-        }
-    }
-
-    else if (menu_curr_state == MENU_STATE_ALBUMS)
-    { //ListTracks        
-        menu_curr_album = -1;
-        for (int i = 0; i < (db.artists)[menu_curr_artist].length; ++i)
-        {
-            printf("%d: %s\n",i,(db.artists)[menu_curr_artist].albums[i].title);
-            if (strncmp((db.artists)[menu_curr_artist].albums[i].title, output, 
-                strlen((db.artists)[menu_curr_artist].albums[i].title)) == 0)
-            {
-                menu_curr_album = i;
-                break;
-            }
-        }        
-        if (menu_curr_album >= 0)
-        {
-            menu_curr_state = MENU_STATE_TRACKS;
-            ShowMenu();
-        }
-        else
-        {
-            printf("No album found!\n");
-            menu_curr_state = MENU_STATE_MAIN;
-        }
-    }
-
-    else if (menu_curr_state == MENU_STATE_TRACKS)
-    {
-        int chosen_track = -1;
-        for (int i = 0; 
-             i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length; 
-            ++i)
-        {
-            char *trck = (db.artists)[
-                menu_curr_artist].albums[menu_curr_album].tracks[i];
-            
-            int output_len = strlen(output);
-            if (strncmp(output, trck, output_len - 1) == 0 
-            && trck[output_len-1] == SIGN_SONG_PATH)
-            {
-                printf("CHOSEN: %s\n", trck);
-                Enqueue(track_queue, strchr(trck, SIGN_SONG_PATH) + 1);
-            }
-        }
-
-        // Reset menu state to the default.
-        menu_curr_state = MENU_STATE_ARTISTS;
-    }
-}
-
 // TODO: Hudge refactor...
 struct MusicDatabase CreateMusicDB()
 {
     // TODO: Instead of guessing its good idea to accualy 
     //       calculate how much memory is needed.
-    char ***arr = (char ***)malloc(256 * sizeof(char**));
+    char ***arr = malloc(256 * sizeof(char**));
     int idx = 0;
 
+    // Makes an array stored in [arr] of every sound file in the
+    // music folder, sorted depth first: artist -> album -> track.
     listdir("/home/mateusz/Music", 0, arr, &idx);
     printf("idx = %d\n", idx);
 
     qsort(arr, idx, sizeof(char **), CompareMusicData);
 
-#pragma region MAKE_MUSIC_DATABASE
     FILE *infile = fopen("music-lib","w");
     char *current_artist = NULL;
     char *current_album = NULL;
@@ -431,9 +227,9 @@ struct MusicDatabase CreateMusicDB()
     {
         char **music_data = arr[i];
         printf("PATH: %s\nTITLE: %s\nALBUM: %s\nARTIST: %s\nTRACK: %s\n\n",
-                music_data[DATA_FILE_PATH],
-                music_data[DATA_TITLE], music_data[DATA_ALBUM_TITLE],
-                music_data[DATA_ALBUM_ARTIST], music_data[DATA_TRACK]);
+            music_data[DATA_FILE_PATH],
+            music_data[DATA_TITLE], music_data[DATA_ALBUM_TITLE],
+            music_data[DATA_ALBUM_ARTIST], music_data[DATA_TRACK]);
 
         if (music_data[DATA_ALBUM_ARTIST] == NULL)
             music_data[DATA_ALBUM_ARTIST] = strdup(UNKNOW_NAME);
@@ -468,9 +264,9 @@ struct MusicDatabase CreateMusicDB()
     }
     fflush(infile);
     fclose(infile);
-#pragma endregion
+
     FILE *music_db = fopen("music-lib", "r");
-    char *line = (char *)malloc(256 * sizeof(char));
+    char *line = malloc(256 * sizeof(char));
     ssize_t nread;
     size_t len;
 
@@ -511,8 +307,7 @@ struct MusicDatabase CreateMusicDB()
 
     fseek(music_db, 0, SEEK_SET);
 
-    struct ArtistInfo *db = 
-        (struct ArtistInfo *)malloc((cur_artist+1) * sizeof(struct ArtistInfo));    
+    struct ArtistInfo *db = malloc((cur_artist+1) * sizeof(struct ArtistInfo));    
 
     cur_artist = -1;
     cur_album = -1;
@@ -526,9 +321,8 @@ struct MusicDatabase CreateMusicDB()
             idx_of_album = -1;
             cur_artist++;
             db[cur_artist].length = artists[cur_artist];
-            db[cur_artist].albums = 
-                (struct AlbumInfo *)malloc(artists[cur_artist] * 
-                 sizeof(struct AlbumInfo));
+            db[cur_artist].albums = malloc(artists[cur_artist] * 
+                sizeof(struct AlbumInfo));
             char *endl_idx = strchr(line + 1, '\n');
             if (endl_idx == NULL)
             {
@@ -544,8 +338,9 @@ struct MusicDatabase CreateMusicDB()
             // artists[cur_artist]++;
             cur_album++;
             db[cur_artist].albums[idx_of_album].length = albums[cur_album];
-            db[cur_artist].albums[idx_of_album].tracks = 
-                (char **)malloc(albums[cur_album] * sizeof(char *));
+            db[cur_artist].albums[idx_of_album].tracks = malloc(
+                albums[cur_album] * sizeof(char *));
+                
             char *endl_idx = strchr(line + 1, '\n');
             if (endl_idx == NULL)
             {

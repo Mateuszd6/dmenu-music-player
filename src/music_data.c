@@ -26,14 +26,7 @@ const char *track_tag_id = "TRCK";
 const char *song_artist_tag_id = "TPE1";
 const char *album_artist_tag_id = "TPE2";
 
-char **CreateMusicData()
-{
-    char **res = (char **)malloc(FILE_INFO_DATA_SIZE * sizeof(char *));
-    for (int i = 0; i < FILE_INFO_DATA_SIZE; ++i)
-        res[i] = NULL;
-    return res;
-}
-
+// Clear the contents of music data but do not delete it.
 void ClearMusicData(char **music_data)
 {
     for (int i = 0; i < FILE_INFO_DATA_SIZE; ++i)
@@ -43,13 +36,7 @@ void ClearMusicData(char **music_data)
     }
 }
 
-void DeleteMusicData(char **music_data)
-{
-    ClearMusicData(music_data);
-    free (music_data);
-    music_data = NULL;
-}
-
+// Set a given field of the music data.
 void SetMusicDataField(char **music_data, const char *content, 
     int tag_size, int field_idx)
 {
@@ -71,6 +58,8 @@ void SetMusicDataField(char **music_data, const char *content,
     }
 }
 
+// Given a ID3 tag, parse it and if its field is interesting (is in [field_mask]) 
+// then set this tag in the [music_data] using [SetMusicDataField].
 void ID3ParseNextTag(char **music_data, const unsigned char *content, 
     int *tag_size, int field_mask)
 {    
@@ -103,6 +92,8 @@ void ID3ParseNextTag(char **music_data, const unsigned char *content,
             (* tag_size), DATA_TRACK);
 }
 
+// Given a file, read only the ID3 data and store important fields
+// in [music_data].
 void GetMusicDataFieldsFromMP3File(
     char *path_to_file, char **music_data, int field_mask)
 {
@@ -134,8 +125,6 @@ void GetMusicDataFieldsFromMP3File(
         id3_content = alloca(sizeof(char) * tag_size);
 
         read(file, id3_content, tag_size);
-        // for (int i = 0; i < tag_size; ++i)    
-        //     printf("%d ", (int)id3_content[i]);    
 
         int idx = 0;
         while (idx < tag_size)
@@ -144,7 +133,8 @@ void GetMusicDataFieldsFromMP3File(
             // TODO: Should I assert that somehow? 
             while (idx < tag_size && id3_content[idx] == '\0')            
                 idx++;
-            if (idx >= tag_size) break;
+            if (idx >= tag_size) 
+                break;
 
             int size = 0;
             ID3ParseNextTag(music_data, &id3_content[idx], &size, 
@@ -158,6 +148,21 @@ void GetMusicDataFieldsFromMP3File(
         printf("No I3 data in the file!\n");
 
     close(file);
+}
+
+char **CreateMusicData()
+{
+    char **res = malloc(FILE_INFO_DATA_SIZE * sizeof(char *));
+    for (int i = 0; i < FILE_INFO_DATA_SIZE; ++i)
+        res[i] = NULL;
+    return res;
+}
+
+void DeleteMusicData(char **music_data)
+{
+    ClearMusicData(music_data);
+    free (music_data);
+    music_data = NULL;
 }
 
 void GetMusicDataFromMP3File (char *path_to_file, char **music_data)
