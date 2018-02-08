@@ -19,12 +19,8 @@ char **CreateMusicData();
 void DeleteMusicData(
     char **data);
 
-// TODO: DO I really need both of these functions?
-void GetMusicDataFieldsFromMP3File(
-    char *path_to_file, 
-    char **music_data, 
-    int field_mask);
-
+// Given a file, read only the ID3 data and store important fields
+// in [music_data].
 void GetMusicDataFromMP3File(
     char *path_to_file, 
     char **music_data);

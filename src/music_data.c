@@ -92,8 +92,6 @@ void ID3ParseNextTag(char **music_data, const unsigned char *content,
             (* tag_size), DATA_TRACK);
 }
 
-// Given a file, read only the ID3 data and store important fields
-// in [music_data].
 void GetMusicDataFieldsFromMP3File(
     char *path_to_file, char **music_data, int field_mask)
 {
@@ -102,9 +100,10 @@ void GetMusicDataFieldsFromMP3File(
     unsigned char *id3_content;
     int tag_size = 0;
 
-    // TODO: check if strdup is OK.
-    if (field_mask & (1 << DATA_FILE_PATH))
-        music_data[DATA_FILE_PATH] = strdup(path_to_file);    
+    // NOTE: For now DATA_FILE_PATH is always set no metter if it is 
+    //       flagged or not. It is needed, beacuse music_data is the
+    //       only thing that [track_queue] holds.  
+    music_data[DATA_FILE_PATH] = strdup(path_to_file);    
 
     file = open(path_to_file, O_RDONLY);
     if (file == -1)
@@ -161,13 +160,20 @@ char **CreateMusicData()
 void DeleteMusicData(char **music_data)
 {
     ClearMusicData(music_data);
-    free (music_data);
+    free(music_data);
     music_data = NULL;
 }
 
-void GetMusicDataFromMP3File (char *path_to_file, char **music_data)
+void GetMusicDataFromMP3File(char *path_to_file, char **music_data)
 {
     GetMusicDataFieldsFromMP3File(
         path_to_file, music_data, 
-        (1 << FILE_INFO_DATA_SIZE)-1);
+        // TODO: Change it to the flags of interesing items.
+        (1 << DATA_FILE_PATH) 
+        | (1 << DATA_TITLE) 
+        | (1 << DATA_ALBUM_ARTIST)
+        | (1 << DATA_ALBUM_TITLE) 
+        | (1 << DATA_TRACK)
+        | (1 << DATA_ARTIST)
+        | (1 << DATA_YEAR));
 }

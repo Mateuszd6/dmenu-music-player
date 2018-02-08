@@ -1,32 +1,44 @@
 #!/bin/bash
 
-# This is a frontend script to the player. Recieving different command it 
-# can start menu, restart player, display the queue, and query the current track
+# This is a frontend script to the player. Recieving different 
+# command it can start menu, restart player, display the queue, 
+# and query the current track
+
+VERBOSE=0
+# IMPORTANT: They must be the same as variables with the same names,
+#            defined in main.c
+LOCKFILE_DIR=/tmp/dmenu-player-lockfile
+FIFO_PIPE_DIR=/tmp/dmenu-player-pipe
+
+help_and_exit () {
+    echo "TODO: SHOW HELP!"
+    exit 1
+}
+
+daemon_is_running () {
+    [ -z "`lslocks | grep $LOCKFILE_DIR`" ]
+}
 
 if [ $# -eq 0 ]; then
-    echo "TODO: SHOW HELP"
-    exit 1    
+    help_and_exit
 fi
-
-verbose=0
 
 case "$1" in 
     menu)
-        # TODO: Open menu. Start dmenu-music-player if needed (check the lockfile).
-        if [ -z "`lslocks | grep /home/mateusz/work/dmenu-music-player/locked_file`" ]; then
+        if daemon_is_running; then
             # It means player is not working yet. Start it immediately.
             echo "DEBUG: There is no lock, starting daemon..."
             ~/work/dmenu-music-player/program &
         else
-            # Player is already running. Send a message that menu is requested.
+            # Player is already running. 
+            # Send a message that menu is requested.
             echo "DEBUG: There is lock."
-	        echo "menu-show" > /tmp/my-fifo-pipe
+	        echo "menu-show" > $FIFO_PIPE_DIR
         fi
         ;;
     track)
         echo "TODO: Show current track: (NOTE: formatting is on the way)."
         ;;
     *)
-        echo "TODO: SHOW HELP"
-        exit 1
-    esac        
+        help_and_exit
+esac

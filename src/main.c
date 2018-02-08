@@ -24,6 +24,9 @@ const int MSG_QUIT = 1 << 2;
 const char *LOCKFILE_DIR = "/tmp/dmenu-player-lockfile";
 const char *FIFO_PIPE_DIR = "/tmp/dmenu-player-pipe";
 
+// A handle to basslib channel.
+unsigned int channel;
+
 int InitPlayer()
 {
     // TODO: Check if file is locked. If so another instance is active
@@ -40,7 +43,6 @@ int InitPlayer()
 
 int InitPipe(int *fd)
 {
-
     // If this file already exist delete it first.
     if(access(FIFO_PIPE_DIR, F_OK) != -1) 
     {
@@ -48,6 +50,7 @@ int InitPipe(int *fd)
         unlink(FIFO_PIPE_DIR);
     }
 
+    // Make a new pipe.
     if (mkfifo(FIFO_PIPE_DIR, S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) != 0)
     {
         // TODO: Should the program be able to run without pipe messages?
@@ -55,6 +58,7 @@ int InitPipe(int *fd)
         return 0;
     }
 
+    // 
     (* fd) = open(FIFO_PIPE_DIR, O_RDONLY | O_NONBLOCK);
     if ((* fd) < 0)
     {
@@ -66,46 +70,6 @@ int InitPipe(int *fd)
     return 1;
 }
 
-// TODO: This is a handle to bass stuff!
-unsigned int channel;
-
-void SetMusicInfo(char *file_path)
-{
-    char **music_data = CreateMusicData();
-    GetMusicDataFromMP3File(file_path, music_data);
-
-    printf("Song info:\n");
-    if (music_data[DATA_ARTIST] != NULL) 
-        printf("Artist: %s\n", music_data[DATA_ARTIST]);    
-    if  (music_data[DATA_ALBUM_ARTIST] != NULL) 
-        printf("Album artist: %s\n", music_data[DATA_ALBUM_ARTIST]);    
-    if  (music_data[DATA_ALBUM_TITLE] != NULL)
-        printf("Album: %s\n", music_data[DATA_ALBUM_TITLE]);            
-    if  (music_data[DATA_YEAR] != NULL)
-        printf("Year: %s\n", music_data[DATA_YEAR]);    
-
-    // TODO: Refactor this. 
-    //       Also add a posibility to call given script after each song 
-    //       starts/ends/is paused etc.
-    // NOTE: This is not important stuff...
-    if  (music_data[DATA_TITLE] != NULL) 
-    {
-        printf("Title: %s\n", music_data[DATA_TITLE]);
-        char buf[512];
-        sprintf(buf, 
-                "/home/mateusz/work/bass-player/src/set_music.sh PLAY \"%s\"", 
-                music_data[DATA_TITLE]);
-        system(buf);
-    }
-    else
-        system("/home/mateusz/work/bass-player/src/set_music.sh PLAY \\<unknown\\>");
-
-    if  (music_data[DATA_TRACK] != NULL)
-        printf("Track: %s\n", music_data[DATA_TRACK]);
-
-    DeleteMusicData(music_data);
-}
-
 int LoadAndPlayMusic(char *file_path)
 {   
     BASS_ChannelStop(channel);
@@ -115,32 +79,26 @@ int LoadAndPlayMusic(char *file_path)
 
     channel = BASS_SampleGetChannel(sample, FALSE);
 
+    player_is_paused = 0;
     BASS_ChannelPlay(channel, FALSE);
 
-    SetMusicInfo(file_path);
-
     return BASS_ErrorGetCode();
-}
-
-void PauseMusic()
-{
-    // TODO: what if channel is null?
-    BASS_ChannelPause(channel);
-}
-
-void ContinueMusic()
-{
-    // TODO: what if channel is null?
-    BASS_ChannelPlay(channel, 0);
 }
 
 void ToggleMusic()
 {
     // TODO: There is much more options to handle here!
+    // TODO: what if channel is null?
     if (BASS_ChannelIsActive(channel) == BASS_ACTIVE_PAUSED)
-        ContinueMusic();
+    {
+        player_is_paused = 0;
+        BASS_ChannelPlay(channel, 0);
+    }
     else
-        PauseMusic();
+    {
+        player_is_paused = 1;
+        BASS_ChannelPause(channel);
+    }
 }
 
 int ProcessMessage(int fd, char *buffer)
@@ -158,7 +116,8 @@ int ProcessMessage(int fd, char *buffer)
     {
         if (strncmp(buffer, "player-queue\n", read_res) == 0)
         {
-            // TODO: What here?
+            // TODO: What here? Probobly nothing coz it is handled another way.
+            //       But check it later.
         }
         else if (strncmp(buffer, "player-toggle-pause\n", read_res) == 0)
         {
@@ -207,7 +166,7 @@ int main(void)
 
     db = CreateMusicDB();
 
-    menu_curr_state = MENU_STATE_ARTISTS;
+    menu_curr_state = MENU_STATE_MAIN;
     CallMenu();
 
     track_queue = InitializeQueue();
@@ -225,7 +184,8 @@ int main(void)
         return -1;
 
     // TODO: TEMP!
-    LoadAndPlayMusic("/home/mateusz/Music/guitar.mp3");
+    Enqueue(track_queue, "/home/mateusz/Music/guitar.mp3");
+    player_is_paused = 0;
 
     // The main loop to handle the incomming messages.
     while (1)
@@ -238,13 +198,29 @@ int main(void)
         // Track has finished. Need to load another track from the queue.
         if (BASS_ChannelIsActive(channel) == 0)
         {
-            if (EmptyQueue(track_queue))
-                // Shut down if no more tracks to play...
-                break;
-            else
+            if (!player_is_paused)
             {
-                LoadAndPlayMusic(Peek(track_queue));
-                Dequeue(track_queue);
+                if (EmptyQueue(track_queue))
+                    // Shut down if no more tracks to play...
+                    break;
+                else
+                {
+                    char **music_data = NULL;
+                    if (Peek(track_queue, &music_data) == 0)
+                    {
+                        LoadAndPlayMusic(music_data[DATA_FILE_PATH]);                    
+                        printf("Playing:\n");
+                        if (music_data[DATA_ARTIST] != NULL) 
+                            printf("Artist: %s\n", music_data[DATA_ARTIST]);    
+                        if  (music_data[DATA_ALBUM_TITLE] != NULL)
+                            printf("Album: %s\n", music_data[DATA_ALBUM_TITLE]);            
+                        if  (music_data[DATA_YEAR] != NULL)
+                            printf("Year: %s\n", music_data[DATA_YEAR]);
+                        DeleteMusicData(music_data);   
+                    }
+
+                    Dequeue(track_queue);
+                }
             }
         }
     }

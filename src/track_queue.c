@@ -3,6 +3,9 @@
 #include <string.h>
 
 #include "track_queue.h"
+#include "music_data.h"
+
+struct Queue *track_queue;
 
 struct Queue *InitializeQueue()
 {
@@ -31,17 +34,18 @@ int EmptyQueue(struct Queue *queue)
     return (queue->tail == NULL);
 }
 
-char *Peek(struct Queue *queue)
+int Peek(struct Queue *queue, char ***music_data)
 {
     // queue->tail == NULL  =>  queue->head == NULL
     assert(queue->tail != NULL || queue->head == NULL);
 
     if (queue->head == NULL)
-        return NULL;
+        return -1;
     else
     {
         assert(queue->tail->next == NULL);
-        return queue->head->value;
+        ( *music_data) = queue->head->music_data;
+        return 0;
     }
 }
 
@@ -49,10 +53,8 @@ void Enqueue (struct Queue *queue, char *value)
 {
     struct QueueNode *last = malloc(sizeof(struct QueueNode));
 
-    int len = strlen(value);
-    last->value = malloc((len + 1) * sizeof(char));
-    memcpy(last->value, value, len);
-    last->value[len] = '\0';
+    last->music_data = CreateMusicData();
+    GetMusicDataFromMP3File(value, last->music_data);
 
     last->next = NULL;
     struct QueueNode *tail = queue->tail;
@@ -82,6 +84,8 @@ void Dequeue (struct Queue *queue)
         }
         else
             queue->head = first->next;
+
+        DeleteMusicData(first->music_data);
         free(first);
     }
 }

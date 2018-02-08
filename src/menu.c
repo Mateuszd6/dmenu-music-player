@@ -9,10 +9,17 @@
 #include "music_library.h"
 #include "menu.h"
 
+int player_is_paused = 1;
+
 // These are used to call dmenu command. 
 // TODO: Let user modify it?
 const char *prefix = "echo -e \"";
 const char *suffix = "\" | dmenu -i";
+const char *menu_main_queue     = "[Queue]\n";
+const char *menu_main_quit      = "[Quit]\n";
+const char *menu_main_favourite = "[Favourite]\n";
+char *menu_main_pause     = "[Pause]\n";
+char *menu_main_play      = "[Play]\n";
 
 // This is a thread which is called when menu is shown.
 // Menu is handed separately, because it cannot block playing the music.
@@ -22,16 +29,32 @@ pthread_t menu_thread;
 // process and CallMenu won't start dmenu.
 int menu_is_running = 0;
 
+char *MakeMainMenu()
+{
+    int pause_len = strlen(menu_main_pause);
+    int play_len = strlen(menu_main_play);
+    char *res = malloc(((pause_len > play_len ? pause_len : play_len) 
+        + strlen(menu_main_queue) + strlen(menu_main_quit) 
+        + strlen(menu_main_favourite) + 1)*sizeof(char));
+    res[0] = '\0';
+    
+    char *play_toggle = player_is_paused ? menu_main_pause : menu_main_play;
+    return strcat(strcat(strcat(strcat(res, play_toggle), menu_main_queue),
+        menu_main_favourite), menu_main_quit);
+}
+
 void ShowMenu()
 {
     // TODO: Think about the size of buffer before allocating 8K bytes...
     char buf[1 << 14];
     int buf_idx = 0;
-    char *msg_content;
+    char *msg_content = NULL;
 
     // TODO: Choose which function to call and generate content based on
     // menu state.
-    if (menu_curr_state == MENU_STATE_ARTISTS)
+    if (menu_curr_state == MENU_STATE_MAIN)
+        msg_content = MakeMainMenu();
+    else if (menu_curr_state == MENU_STATE_ARTISTS)
         msg_content = ListArtists();        
     else if (menu_curr_state == MENU_STATE_ALBUMS)
         msg_content = ListAlbums((db.artists)[menu_curr_artist]);
@@ -113,7 +136,32 @@ void HandleDmenuOutput(const char *output)
 {
     printf("MENU STATE: %d\n", menu_curr_state);
 
-    if (menu_curr_state == MENU_STATE_ARTISTS)
+    if (menu_curr_state == MENU_STATE_MAIN)
+    {
+        if (strcmp(output, menu_main_play) == 0)
+        {
+            printf("UNPAUSING\n");
+        }
+        else if (strcmp(output, menu_main_pause) == 0)
+        {
+            printf("PAUSING\n");
+        }
+        else if (strcmp(output, menu_main_favourite) == 0)
+        {
+            printf("DISPLAYING FAVOURITE...\n");
+        }
+        else if (strcmp(output, menu_main_queue) == 0)
+        {
+            menu_curr_state = MENU_STATE_ARTISTS;
+            ShowMenu();    
+        }
+        else if (strcmp(output, menu_main_quit) == 0)
+        {
+            printf("QUITTTTTIIIINGGG\n");
+        }
+    }    
+
+    else if (menu_curr_state == MENU_STATE_ARTISTS)
     {
         menu_curr_artist = -1;
         for (int i = 0; i < db.length; ++i)

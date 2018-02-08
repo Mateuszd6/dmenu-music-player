@@ -110,12 +110,7 @@ void listdir(const char *name, int indent, char ***arr, int* idx)
             sprintf(buf, "%s/%s", name, entry->d_name);
             printf(buf);
             printf("\n");
-            GetMusicDataFieldsFromMP3File(buf, music_data,
-                (1 << DATA_FILE_PATH)
-                    | (1 << DATA_TITLE)
-                    | (1 << DATA_ALBUM_ARTIST)
-                    | (1 << DATA_ALBUM_TITLE)
-                    | (1 << DATA_TRACK));
+            GetMusicDataFromMP3File(buf, music_data);
 
             arr[(* idx)++] = music_data;
             // DeleteMusicData(music_data);
