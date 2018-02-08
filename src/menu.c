@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "track_queue.h"
-
 #include "misc.h"
 #include "music_data.h"
 #include "music_library.h"
@@ -25,7 +24,7 @@ int menu_is_running = 0;
 
 void ShowMenu()
 {
-    // TODO: Think about the sive of buffer before allocating 8K bytes...
+    // TODO: Think about the size of buffer before allocating 8K bytes...
     char buf[1 << 14];
     int buf_idx = 0;
     char *msg_content;
@@ -74,6 +73,9 @@ void ShowMenu()
     {
         printf("No DMENU output!\n");
         pclose(dmenu_pipe);
+
+        // TODO: Change to MENU_STATE_MAIN once created.
+        menu_curr_state = MENU_STATE_ARTISTS;
         return;
     }
 

@@ -21,6 +21,9 @@
 // TODO: Make nice messages system.
 const int MSG_QUIT = 1 << 2;
 
+const char *LOCKFILE_DIR = "/tmp/dmenu-player-lockfile";
+const char *FIFO_PIPE_DIR = "/tmp/dmenu-player-pipe";
+
 int InitPlayer()
 {
     // TODO: Check if file is locked. If so another instance is active
@@ -37,23 +40,22 @@ int InitPlayer()
 
 int InitPipe(int *fd)
 {
-    char *myfifo = "/tmp/my-fifo-pipe";
 
     // If this file already exist delete it first.
-    if(access(myfifo, F_OK) != -1) 
+    if(access(FIFO_PIPE_DIR, F_OK) != -1) 
     {
         // TODO: Handle the case when program cannot remove this file.
-        unlink(myfifo);
+        unlink(FIFO_PIPE_DIR);
     }
 
-    if (mkfifo(myfifo, S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) != 0)
+    if (mkfifo(FIFO_PIPE_DIR, S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH) != 0)
     {
         // TODO: Should the program be able to run without pipe messages?
         printf("Couldn't make fifo pipe.\n");
         return 0;
     }
 
-    (* fd) = open(myfifo, O_RDONLY | O_NONBLOCK);
+    (* fd) = open(FIFO_PIPE_DIR, O_RDONLY | O_NONBLOCK);
     if ((* fd) < 0)
     {
         // TODO: The program should be able to run without pipe messages.
@@ -194,10 +196,10 @@ int ProcessMessage(int fd, char *buffer)
 int main(void)
 {
     // TODO: Specify lock_file dir? Or use relative path?
-    int fi = open("./locked_file", O_CREAT);
+    int lock_file = open(LOCKFILE_DIR, O_CREAT);
 
     // TODO: Should the music player be able to run without lockfile?
-    if (fi == -1 || flock(fi, LOCK_EX) != 0) 
+    if (lock_file == -1 || flock(lock_file, LOCK_EX) != 0) 
     {
         printf("Error opening lock file. Exitting...");
         return 255;
@@ -252,9 +254,13 @@ int main(void)
     
     // TODO: BASS cleanup.
 	BASS_Stop();
-	BASS_Free();
-
-    system("/home/mateusz/work/bass-player/src/set_music.sh END"); 
+	BASS_Free();    
+    
+    if (flock(lock_file, LOCK_UN) != 0)
+    {
+        printf("Error, could not realese the lock file.\n");
+        return -1;
+    }
 
     return 0;
 }
