@@ -93,31 +93,13 @@ void ShowMenu()
     }
 
     // The pipe used to read dmenu's output.
-    FILE *dmenu_pipe;
     char output_buff[1024];
 
-    // Execute command stored in buffer and use pipe to read it's output.
-    dmenu_pipe = popen(buf, "r");
-    if (dmenu_pipe == NULL) 
-    {
-        printf("Failed to run command\n" );
-        exit(1);
-    }
+    GetSystemCommandOneLineOutput(buf, output_buff, 1024 - 1);
+    printf("DMENU OUTPUT: %s", output_buff);
 
-    // Dmenu should procude one line of output, so the rest is ignored.
-    if (fgets(output_buff, sizeof(output_buff)-1, dmenu_pipe) == NULL) 
-    {
-        printf("No DMENU output!\n");
-        pclose(dmenu_pipe);
-
-        menu_curr_state = MENU_STATE_MAIN;
-        return;
-    }
-
-    pclose(dmenu_pipe);
     HandleDmenuOutput(output_buff);
 }
-
 
 void *StartMenuThread(void *args)
 {

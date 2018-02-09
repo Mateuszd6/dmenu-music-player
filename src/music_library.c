@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <string.h>
+#include <assert.h>
 
 #include "misc.h"
 #include "music_data.h"
@@ -210,6 +211,19 @@ void MakeMusicDatbase()
     
     FILE *infile = fopen(music_lib_path, "w");
     
+    char output_buffer[25];
+    char command_buffer[256];
+    sprintf(command_buffer, 
+        "find %s -type f -exec stat \\{} --printf=\"%cy\\n\" \\; | sort -n -r | head -n 1",
+        music_lib_path,
+        '%');
+    GetSystemCommandOneLineOutput(command_buffer, output_buffer, 20);
+    strcat(output_buffer, "\n");
+
+    // The first line is basically the info about last change in Music directory
+    // when this file was created.
+    fprintf(infile, output_buffer);
+
     char *current_artist = NULL;
     char *current_album = NULL;
 
@@ -264,6 +278,9 @@ void MakeMusicDatbase()
 
 struct MusicDatabase CreateMusicDB()
 {
+    // TODO: For now make it every time.
+    MakeMusicDatbase();
+
     struct MusicDatabase res;
 
     FILE *music_db = fopen(MUSIC_LIB_FILE_NAME, "r");
@@ -277,23 +294,15 @@ struct MusicDatabase CreateMusicDB()
     int cur_artist = -1;
     int cur_album = -1;
 
+    // NOTE: Skip the first line because it contains date of last edit.
     nread = getline(&line, &len, music_db);
-
     if (nread == -1)
     {
-        printf("MUSIC DB IS EMPTY!!!\n");
-        force_quit = 1;
+        printf("MUSIC DATA IS EMPTY!\n");
+        res.artists = NULL;
+        res.length = 0;
         return res;
     }
-    
-    assert(line[0] = SIGN_CREATE_TIME);
-
-    // TODO: Check if folder with music has changed sice last 'dmus-music-lib' creation.
-    if (1)
-    {
-        MakeMusicDatbase();
-    }
-
 
     while ((nread = getline(&line, &len, music_db)) != -1) 
     {
@@ -326,6 +335,8 @@ struct MusicDatabase CreateMusicDB()
     cur_album = -1;
     int idx_of_album = -1;
     int idx_of_song = -1;
+    
+    getline(&line, &len, music_db);
     while ((nread = getline(&line, &len, music_db)) != -1) 
     {
         printf(line);
@@ -389,6 +400,7 @@ struct MusicDatabase CreateMusicDB()
             for (int k = 0; k < db[i].albums[j].length; ++k)
                 printf("\t\tTRACK:%s\n", db[i].albums[j].tracks[k]);
         }
+        fflush(stdout);
     }
 
     fclose(music_db);
