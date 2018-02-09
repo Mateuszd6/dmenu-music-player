@@ -51,6 +51,7 @@ void SetMusicDataField(char **music_data, const char *content,
 
     if (size < tag_size)
     {
+        free(music_data[field_idx]);
         music_data[field_idx] = malloc((tag_size-size+1) * sizeof(char));
         memcpy(music_data[field_idx], content+size, (tag_size-size) * sizeof(char));
         // TODO: Sure?
@@ -159,7 +160,7 @@ char **CreateMusicData()
 
 void DeleteMusicData(char **music_data)
 {
-    ClearMusicData(music_data);
+     ClearMusicData(music_data);
     free(music_data);
     music_data = NULL;
 }

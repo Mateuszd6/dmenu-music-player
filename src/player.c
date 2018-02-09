@@ -5,6 +5,8 @@
 
 int player_is_paused = 1;
 
+int force_quit = 0;
+
 // A handle to basslib channel.
 unsigned int channel;
 

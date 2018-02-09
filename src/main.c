@@ -1,7 +1,6 @@
 /*
-    TODO: Line that cat's 256 bytes from each file in ~/Music dir. to tmp file.  
-          use it to check for important changes in ~/Music directory.
-          find . -type f -print0 | sort -z | xargs -0 head -c 256 > tmp
+    TODO: Use it to check for important changes in ~/Music directory.
+          find . -type f -exec stat \{} --printf="%y\n" \; | sort -n -r | head -n 1
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,9 +15,6 @@
 #include "music_library.h"
 #include "menu.h"
 #include "player.h"
-
-// TODO: Make nice messages system.
-const int MSG_QUIT = 1 << 2;
 
 const char *LOCKFILE_DIR = "/tmp/dmenu-player-lockfile";
 const char *FIFO_PIPE_DIR = "/tmp/dmenu-player-pipe";
@@ -40,7 +36,6 @@ int InitPipe(int *fd)
         return 0;
     }
 
-    // 
     (* fd) = open(FIFO_PIPE_DIR, O_RDONLY | O_NONBLOCK);
     if ((* fd) < 0)
     {
@@ -52,7 +47,7 @@ int InitPipe(int *fd)
     return 1;
 }
 
-int ProcessMessage(int fd, char *buffer)
+void ProcessMessage(int fd, char *buffer)
 {
     int read_res;
     read_res = read(fd, buffer, 1 << 20);
@@ -60,7 +55,7 @@ int ProcessMessage(int fd, char *buffer)
     {
         // TODO: Don't check pipe any more!
         printf("Error with the pipe.\n");
-        return -1;
+        return;
     }
 
     // If there is a message hande it!
@@ -79,7 +74,7 @@ int ProcessMessage(int fd, char *buffer)
         else if (strncmp(buffer, "player-quit\n", read_res) == 0)
         {
             printf("Quitting...\n");
-            return MSG_QUIT;
+            force_quit = 1;
         }
         // NOTE: This is purely debug operation, becasue it is pritned to
         //       the deamons output, not the bash script, who has called it.
@@ -101,13 +96,11 @@ int ProcessMessage(int fd, char *buffer)
             printf("Received unrecognized message: %.*s\n", read_res, buffer);
         }
         // TODO: Change to action code?
-        return 0;
     }
 
     else
     {
         printf("!\n");
-        return 0;
     }
 }
 
@@ -147,8 +140,8 @@ int main(void)
     // The main loop to handle the incomming messages.
     while (1)
     {
-        if (ProcessMessage(fd, buffer) == MSG_QUIT)
-            break;
+        ProcessMessage(fd, buffer);
+        if (force_quit) break;
 
         usleep(1000 * 100);
 
@@ -167,14 +160,16 @@ int main(void)
                     {
                         LoadAndPlayMusic(music_data[DATA_FILE_PATH]);                    
                         printf("Playing:\n");
+                        if (music_data[DATA_TITLE] != NULL)
+                            printf("Title: %s\n", music_data[DATA_TITLE]);
                         if (music_data[DATA_ARTIST] != NULL) 
                             printf("Artist: %s\n", music_data[DATA_ARTIST]);    
                         if  (music_data[DATA_ALBUM_TITLE] != NULL)
                             printf("Album: %s\n", music_data[DATA_ALBUM_TITLE]);            
                         if  (music_data[DATA_YEAR] != NULL)
                             printf("Year: %s\n", music_data[DATA_YEAR]);
-                        DeleteMusicData(music_data);   
                     }
+                    music_data = NULL;
 
                     Dequeue(track_queue);
                 }
@@ -183,9 +178,7 @@ int main(void)
     }
 
     // Cleanup.
-    close(fd);
-    
-    // TODO: BASS cleanup.
+    close(fd);    
     CleanPlayer();
     
     if (flock(lock_file, LOCK_UN) != 0)

@@ -1,9 +1,15 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-
 extern int player_is_paused;
-extern unsigned int channel;
+
+// Is dmenu already on the scren?
+// Also: Is seperate thread used only to call dmenu command in 
+//       non-blocking mode active?
+extern int menu_is_running;
+
+// If true program breaks the main loop and quits.
+extern int force_quit;
 
 void UnpauseMusic();
 

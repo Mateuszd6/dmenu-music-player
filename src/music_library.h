@@ -17,6 +17,9 @@ extern int menu_curr_state;
 extern int menu_curr_artist;
 extern int menu_curr_album;
 
+extern char *MUSIC_DIR;
+extern char *MUSIC_DATABASE_DIR;
+
 struct AlbumInfo
 {
     // These are titles displayed in the menu.

@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <dirent.h>
 #include <string.h>
 
@@ -7,6 +7,7 @@
 #include "music_data.h"
 #include "music_library.h"
 #include "track_queue.h"
+#include "player.h"
 
 // TODO: Use some normal format like xml, 
 //       not plain ASCII characters.
@@ -14,6 +15,7 @@ const char SIGN_ARTIST = '\001';
 const char SIGN_ALBUM_TITLE = '\002';
 const char SIGN_SONG_TITLE = '\003';
 const char SIGN_SONG_PATH = '\004';
+const char SIGN_CREATE_TIME = '\005';
 
 const int MENU_STATE_NONE = 0;
 const int MENU_STATE_MAIN = 1;
@@ -27,6 +29,10 @@ int menu_curr_artist = 0;
 int menu_curr_album = 0;
 
 const char *UNKNOW_NAME = "<unknow>";
+
+char *MUSIC_DIR = "/home/mateusz/Music";
+char *MUSIC_DATABASE_DIR = "/home/mateusz/work/dmenu-music-player";
+const char *MUSIC_LIB_FILE_NAME = "dmus-music-lib";
 
 // Used to sort music data. 
 // TODO: Allow different user configurations?
@@ -181,8 +187,9 @@ char *ListTracks(struct AlbumInfo albumInfo)
     return strdup(res);
 }
 
-// TODO: Hudge refactor...
-struct MusicDatabase CreateMusicDB()
+// Make music database and save it to the file. Only called when 
+// previously created 'MUSIC_LIB_FILE_NAME' doesn't exist or is out-of-date.
+void MakeMusicDatbase()
 {
     // TODO: Instead of guessing its good idea to accualy 
     //       calculate how much memory is needed.
@@ -191,12 +198,18 @@ struct MusicDatabase CreateMusicDB()
 
     // Makes an array stored in [arr] of every sound file in the
     // music folder, sorted depth first: artist -> album -> track.
-    listdir("/home/mateusz/Music", 0, arr, &idx);
+    listdir(MUSIC_DIR, 0, arr, &idx);
     printf("idx = %d\n", idx);
 
     qsort(arr, idx, sizeof(char **), CompareMusicData);
 
-    FILE *infile = fopen("music-lib","w");
+    char music_lib_path[256];
+    music_lib_path[0] = '\0';
+    strcat(strcat(strcat(
+        music_lib_path, MUSIC_DATABASE_DIR), "/"), MUSIC_LIB_FILE_NAME);
+    
+    FILE *infile = fopen(music_lib_path, "w");
+    
     char *current_artist = NULL;
     char *current_album = NULL;
 
@@ -238,19 +251,49 @@ struct MusicDatabase CreateMusicDB()
             SIGN_SONG_TITLE, music_data[DATA_TITLE], 
             SIGN_SONG_PATH, music_data[DATA_FILE_PATH]);
     }
+
+    // TODO: This cleanup takes a lot of time...
+    for (int i = 0; i < idx; ++i)
+        DeleteMusicData(arr[i]);
+    free(arr);
+    arr = NULL;
+
     fflush(infile);
     fclose(infile);
+}
 
-    FILE *music_db = fopen("music-lib", "r");
+struct MusicDatabase CreateMusicDB()
+{
+    struct MusicDatabase res;
+
+    FILE *music_db = fopen(MUSIC_LIB_FILE_NAME, "r");
     char *line = malloc(256 * sizeof(char));
     ssize_t nread;
-    size_t len;
+    size_t len; 
 
     int artists[256];
     int albums[512];
 
     int cur_artist = -1;
     int cur_album = -1;
+
+    nread = getline(&line, &len, music_db);
+
+    if (nread == -1)
+    {
+        printf("MUSIC DB IS EMPTY!!!\n");
+        force_quit = 1;
+        return res;
+    }
+    
+    assert(line[0] = SIGN_CREATE_TIME);
+
+    // TODO: Check if folder with music has changed sice last 'dmus-music-lib' creation.
+    if (1)
+    {
+        MakeMusicDatbase();
+    }
+
 
     while ((nread = getline(&line, &len, music_db)) != -1) 
     {
@@ -265,7 +308,7 @@ struct MusicDatabase CreateMusicDB()
             cur_album++;
             albums[cur_album] = 0;
         }
-        else
+        else if (line[0] == SIGN_SONG_TITLE)
         {
             albums[cur_album]++;
         }
@@ -350,9 +393,9 @@ struct MusicDatabase CreateMusicDB()
 
     fclose(music_db);
 
-    struct MusicDatabase res;
     res.length = cur_artist;
     res.artists = db;
 
+    free(line);
     return res;
 }

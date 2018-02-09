@@ -11,15 +11,17 @@
 #include "menu.h"
 
 // These are used to call dmenu command. 
-// TODO: Let user modify it?
+// TODO: Let user modify the command with which dmenu is called?
 const char *prefix = "echo -e \"";
 const char *suffix = "\" | dmenu -i";
+
+// These are commands used to create main menu msg.
 const char *menu_main_queue     = "[Queue]\n";
 const char *menu_main_quit      = "[Quit]\n";
-// TODO: This is not implemented yet. 
-const char *menu_main_favourite = "[Favourite]\n";
-char *menu_main_pause     = "[Pause]\n";
-char *menu_main_play      = "[Play]\n";
+const char *menu_main_next      = "[Next]\n";
+// TODO: Making them const results with a warning:
+char *menu_main_pause           = "[Pause]\n";
+char *menu_main_play            = "[Play]\n";
 
 // This is a thread which is called when menu is shown.
 // Menu is handed separately, because it cannot block playing the music.
@@ -29,20 +31,30 @@ pthread_t menu_thread;
 // process and CallMenu won't start dmenu.
 int menu_is_running = 0;
 
+// Create msg contant for main menu.
 char *MakeMainMenu()
 {
     int pause_len = strlen(menu_main_pause);
     int play_len = strlen(menu_main_play);
-    char *res = malloc((
-        (pause_len > play_len ? pause_len : play_len) 
+    
+    int msg_len = (pause_len > play_len ? pause_len : play_len) 
         + strlen(menu_main_queue) 
         + strlen(menu_main_quit) 
-        + 1)*sizeof(char));
+        + strlen(menu_main_next)
+        + 1;
+
+    char *res = malloc(msg_len * sizeof(char));
     res[0] = '\0';
     
     char *play_toggle = player_is_paused ? menu_main_play : menu_main_pause;
-    return strcat(strcat(strcat(
-        res, play_toggle), menu_main_queue), menu_main_quit);
+    strcat(strcat(strcat(strcat(
+        res, play_toggle), menu_main_next), menu_main_queue), menu_main_quit);    
+    
+    // It's because final msg cannot have '\n' on its end or there will be a 
+    // empty option in the dmenu.
+    res[msg_len-2] = '\0';
+
+    return res;
 }
 
 void ShowMenu()
@@ -109,13 +121,15 @@ void ShowMenu()
 
 void *StartMenuThread(void *args)
 {
+    menu_is_running = 1;
+
     // Silent a warning about [args] being not used.  
     if (args) {}
 
     ShowMenu();
-    menu_is_running = 0;
-
     printf("\x1b[32mMenu thread terminates.\x1b[0m\n");
+
+    menu_is_running = 0;
     return NULL;
 }
 
@@ -127,7 +141,6 @@ void CallMenu()
         printf("MENU_IS_ALREADY_RUNNING!\n");
         return;
     }
-    menu_is_running = 1;
 
     pthread_create(&menu_thread, NULL, StartMenuThread, NULL);
 }
@@ -146,10 +159,6 @@ void HandleDmenuOutput(const char *output)
         {
             PauseMusic();                
         }
-        else if (strcmp(output, menu_main_favourite) == 0)
-        {
-            printf("DISPLAYING FAVOURITE...\n");
-        }
         else if (strcmp(output, menu_main_queue) == 0)
         {
             menu_curr_state = MENU_STATE_ARTISTS;
@@ -157,7 +166,8 @@ void HandleDmenuOutput(const char *output)
         }
         else if (strcmp(output, menu_main_quit) == 0)
         {
-            printf("QUITTTTTIIIINGGG\n");
+            force_quit = 1;
+            printf("QUITTING!\n");
         }
     }    
 
