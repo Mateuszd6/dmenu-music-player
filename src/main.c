@@ -11,35 +11,17 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 
-#include <bass.h>
-
 #include "track_queue.h"
 #include "music_data.h"
 #include "music_library.h"
 #include "menu.h"
+#include "player.h"
 
 // TODO: Make nice messages system.
 const int MSG_QUIT = 1 << 2;
 
 const char *LOCKFILE_DIR = "/tmp/dmenu-player-lockfile";
 const char *FIFO_PIPE_DIR = "/tmp/dmenu-player-pipe";
-
-// A handle to basslib channel.
-unsigned int channel;
-
-int InitPlayer()
-{
-    // TODO: Check if file is locked. If so another instance is active
-    //       and we kill program. Is this feature such important?
-    if (!BASS_Init(-1, 44100, 0, 0, NULL))
-    {
-        printf ("Unable to inicialize. Error code: %d\n",
-            BASS_ErrorGetCode());
-        return 0;
-    }
-
-    return 1;
-}
 
 int InitPipe(int *fd)
 {
@@ -70,37 +52,6 @@ int InitPipe(int *fd)
     return 1;
 }
 
-int LoadAndPlayMusic(char *file_path)
-{   
-    BASS_ChannelStop(channel);
-    // Load and play the file.
-    unsigned int sample = BASS_SampleLoad(
-        0, file_path, 0, 0, 1, BASS_SAMPLE_MONO);
-
-    channel = BASS_SampleGetChannel(sample, FALSE);
-
-    player_is_paused = 0;
-    BASS_ChannelPlay(channel, FALSE);
-
-    return BASS_ErrorGetCode();
-}
-
-void ToggleMusic()
-{
-    // TODO: There is much more options to handle here!
-    // TODO: what if channel is null?
-    if (BASS_ChannelIsActive(channel) == BASS_ACTIVE_PAUSED)
-    {
-        player_is_paused = 0;
-        BASS_ChannelPlay(channel, 0);
-    }
-    else
-    {
-        player_is_paused = 1;
-        BASS_ChannelPause(channel);
-    }
-}
-
 int ProcessMessage(int fd, char *buffer)
 {
     int read_res;
@@ -111,6 +62,7 @@ int ProcessMessage(int fd, char *buffer)
         printf("Error with the pipe.\n");
         return -1;
     }
+
     // If there is a message hande it!
     else if (read_res > 0)
     {
@@ -129,6 +81,12 @@ int ProcessMessage(int fd, char *buffer)
             printf("Quitting...\n");
             return MSG_QUIT;
         }
+        // NOTE: This is purely debug operation, becasue it is pritned to
+        //       the deamons output, not the bash script, who has called it.
+        else if (strncmp(buffer, "player-print-queue\n", read_res) == 0)
+        {
+            PrintQueue(track_queue); 
+        }
         // TODO: Call dmenu via bash or shortcut.
         else if (strncmp(buffer, "menu-show\n", read_res) == 0)
         {
@@ -145,6 +103,7 @@ int ProcessMessage(int fd, char *buffer)
         // TODO: Change to action code?
         return 0;
     }
+
     else
     {
         printf("!\n");
@@ -155,25 +114,20 @@ int ProcessMessage(int fd, char *buffer)
 int main(void)
 {
     // TODO: Specify lock_file dir? Or use relative path?
-    int lock_file = open(LOCKFILE_DIR, O_CREAT);
+    int lock_file = open(LOCKFILE_DIR, O_CREAT | O_WRONLY);
 
     // TODO: Should the music player be able to run without lockfile?
-    if (lock_file == -1 || flock(lock_file, LOCK_EX) != 0) 
+    if (lock_file == -1 || flock(lock_file, LOCK_EX | LOCK_NB) != 0) 
     {
         printf("Error opening lock file. Exitting...");
         return 255;
     }    
 
+    if (InitPlayer() != 0) return -1;
+
     db = CreateMusicDB();
-
-    menu_curr_state = MENU_STATE_MAIN;
-    CallMenu();
-
     track_queue = InitializeQueue();
     
-    if (!InitPlayer())
-        return -1;
-
     // Handler to a pipe file and buffer for the messages.
     int fd;
 
@@ -187,6 +141,9 @@ int main(void)
     Enqueue(track_queue, "/home/mateusz/Music/guitar.mp3");
     player_is_paused = 0;
 
+    menu_curr_state = MENU_STATE_MAIN;
+    CallMenu();
+
     // The main loop to handle the incomming messages.
     while (1)
     {
@@ -196,7 +153,7 @@ int main(void)
         usleep(1000 * 100);
 
         // Track has finished. Need to load another track from the queue.
-        if (BASS_ChannelIsActive(channel) == 0)
+        if (PlayerIsBusy())
         {
             if (!player_is_paused)
             {
@@ -229,8 +186,7 @@ int main(void)
     close(fd);
     
     // TODO: BASS cleanup.
-	BASS_Stop();
-	BASS_Free();    
+    CleanPlayer();
     
     if (flock(lock_file, LOCK_UN) != 0)
     {

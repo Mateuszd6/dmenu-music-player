@@ -89,3 +89,25 @@ void Dequeue (struct Queue *queue)
         free(first);
     }
 }
+
+void PrintQueue (struct Queue *queue)
+{
+    struct QueueNode *current = queue->head;
+    // If the queue is empty...
+    if (current == NULL)
+    {
+        printf("The queue is empty.\n");
+        return;
+    }
+
+    printf("Here goes the queue:\n");
+    while (1)
+    {
+        printf("TITLE: %s\n", current->music_data[DATA_TITLE]);
+
+        if (current->next == NULL)
+            break;
+        else 
+            current = current->next;
+    }
+}

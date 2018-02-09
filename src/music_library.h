@@ -1,11 +1,6 @@
 #ifndef MUSIC_LIBRARY_H
 #define MUSIC_LIBRARY_H
 
-// TODO: It this needed?
-// extern const char *UNKNOW_NAME;
-
-// TODO: Use some normal format like xml, 
-//       not plain ASCII characters.
 extern const char SIGN_ARTIST;
 extern const char SIGN_ALBUM_TITLE;
 extern const char SIGN_SONG_TITLE;

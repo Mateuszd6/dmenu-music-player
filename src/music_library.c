@@ -126,21 +126,14 @@ void listdir(const char *name, int indent, char ***arr, int* idx)
 char *ListArtists()
 {
     // TODO: realloc for more characters.
-    char res[256];
+    char res[1024];
     int idx = 0;
-    
+
     for (int i = 0; i < db.length; ++i)
     {
-        for (unsigned int j = 0; j < strlen((db.artists)[i].name); ++j)
-        {
-            res[idx] = (db.artists)[i].name[j];
-            idx++;
-        }
+        PrintToBufferAtIndex(res, (db.artists)[i].name, &idx);
         if (i < db.length -1)
-        {
-            res[idx++] = '\\';
-            res[idx++] = 'n';
-        }
+            PrintToBufferAtIndex(res, "\\n", &idx);
     }
     res[idx++] = '\0';
     return strdup(res);
@@ -150,22 +143,14 @@ char *ListArtists()
 char *ListAlbums(struct ArtistInfo artistInfo)
 {
     // TODO: realloc for more characters.
-    char res[256];
+    char res[1024];
     int idx = 0;
     
     for (int i = 0; i < artistInfo.length; ++i)
     {
-        for (unsigned int j = 0; j < strlen(artistInfo.albums[i].title); ++j)
-        {
-            res[idx] = artistInfo.albums[i].title[j];
-            idx++;
-        }
+        PrintToBufferAtIndex(res, artistInfo.albums[i].title, &idx);
         if (i < artistInfo.length-1)
-        {
-            res[idx++] = '\\';
-            res[idx++] = 'n';
-        }
-        printf("%s\n", artistInfo.albums[i].title);
+            PrintToBufferAtIndex(res, "\\n", &idx);
     }
     res[idx++] = '\0';
     return strdup(res);
@@ -175,9 +160,10 @@ char *ListAlbums(struct ArtistInfo artistInfo)
 char *ListTracks(struct AlbumInfo albumInfo)
 {
     // TODO: realloc for more characters.
-    char res[256];
+    char res[1024];
     int idx = 0;
     
+    PrintToBufferAtIndex(res, "[.]\\n", &idx);
     for (int i = 0; i < albumInfo.length; ++i)
     {
         for (int j = 0; 
@@ -188,11 +174,7 @@ char *ListTracks(struct AlbumInfo albumInfo)
             idx++;
         }
         if (i < albumInfo.length-1)
-        {
-            res[idx++] = '\\';
-            res[idx++] = 'n';
-        }
-        printf("%s\n", albumInfo.tracks[i]);
+            PrintToBufferAtIndex(res, "\\n", &idx);
     }
 
     res[idx++] = '\0';
@@ -242,8 +224,7 @@ struct MusicDatabase CreateMusicDB()
         }
 
         if (current_album == NULL 
-        // TODO: This stays here in the case there are same named albums from
-        //       different artist. But it is now checked twice... Big deal?
+        // NOTE: This stays here in the case there are same named albums from
         || strcmp(current_artist, music_data[DATA_ALBUM_ARTIST]) != 0
         || strcmp(current_album, music_data[DATA_ALBUM_TITLE]) != 0)
         {
@@ -273,25 +254,19 @@ struct MusicDatabase CreateMusicDB()
 
     while ((nread = getline(&line, &len, music_db)) != -1) 
     {
-        // printf(line);
         if (line[0] == SIGN_ARTIST)
         {
             cur_artist++;
             artists[cur_artist] = 0;
-            // printf("\tInc. index; cur_artist = %d\n", cur_artist);
         }
         else if (line[0] == SIGN_ALBUM_TITLE)
         {
             artists[cur_artist]++;
             cur_album++;
             albums[cur_album] = 0;
-            // printf("\t\tInc. album index; cur_album = %d\n", cur_album);
-            // printf("\t\tFound album, cur_artist: %d, artists[%d]++ = %d\n", 
-                // cur_artist, cur_artist, artists[cur_artist]);
         }
         else
         {
-            // printf("\t\t\tFound track\n");
             albums[cur_album]++;
         }
     }
@@ -346,11 +321,6 @@ struct MusicDatabase CreateMusicDB()
                 db[cur_artist].albums[idx_of_album].title = 
                     strndup(line+1, endl_idx-line-1);
             idx_of_song = -1;
-            // albums[cur_album] = 0;
-
-            // printf("\t\tInc. album index; cur_album = %d\n", cur_album);
-            // printf("\t\tFound album, cur_artist: %d, artists[%d]++ = %d\n", 
-                // cur_artist, cur_artist, artists[cur_artist]);
         }
         else
         {

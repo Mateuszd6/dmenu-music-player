@@ -7,9 +7,8 @@
 #include "misc.h"
 #include "music_data.h"
 #include "music_library.h"
+#include "player.h"
 #include "menu.h"
-
-int player_is_paused = 1;
 
 // These are used to call dmenu command. 
 // TODO: Let user modify it?
@@ -17,6 +16,7 @@ const char *prefix = "echo -e \"";
 const char *suffix = "\" | dmenu -i";
 const char *menu_main_queue     = "[Queue]\n";
 const char *menu_main_quit      = "[Quit]\n";
+// TODO: This is not implemented yet. 
 const char *menu_main_favourite = "[Favourite]\n";
 char *menu_main_pause     = "[Pause]\n";
 char *menu_main_play      = "[Play]\n";
@@ -33,14 +33,16 @@ char *MakeMainMenu()
 {
     int pause_len = strlen(menu_main_pause);
     int play_len = strlen(menu_main_play);
-    char *res = malloc(((pause_len > play_len ? pause_len : play_len) 
-        + strlen(menu_main_queue) + strlen(menu_main_quit) 
-        + strlen(menu_main_favourite) + 1)*sizeof(char));
+    char *res = malloc((
+        (pause_len > play_len ? pause_len : play_len) 
+        + strlen(menu_main_queue) 
+        + strlen(menu_main_quit) 
+        + 1)*sizeof(char));
     res[0] = '\0';
     
-    char *play_toggle = player_is_paused ? menu_main_pause : menu_main_play;
-    return strcat(strcat(strcat(strcat(res, play_toggle), menu_main_queue),
-        menu_main_favourite), menu_main_quit);
+    char *play_toggle = player_is_paused ? menu_main_play : menu_main_pause;
+    return strcat(strcat(strcat(
+        res, play_toggle), menu_main_queue), menu_main_quit);
 }
 
 void ShowMenu()
@@ -70,7 +72,6 @@ void ShowMenu()
     PrintToBufferAtIndex(buf, prefix, &buf_idx);
     PrintToBufferAtIndex(buf, msg_content, &buf_idx);
     PrintToBufferAtIndex(buf, suffix, &buf_idx);
-    // TODO: For sure?
     PrintToBufferAtIndex(buf, "\0", &buf_idx);
 
     if (msg_content != NULL)
@@ -97,8 +98,7 @@ void ShowMenu()
         printf("No DMENU output!\n");
         pclose(dmenu_pipe);
 
-        // TODO: Change to MENU_STATE_MAIN once created.
-        menu_curr_state = MENU_STATE_ARTISTS;
+        menu_curr_state = MENU_STATE_MAIN;
         return;
     }
 
@@ -139,12 +139,12 @@ void HandleDmenuOutput(const char *output)
     if (menu_curr_state == MENU_STATE_MAIN)
     {
         if (strcmp(output, menu_main_play) == 0)
-        {
-            printf("UNPAUSING\n");
+        {        
+            UnpauseMusic();
         }
         else if (strcmp(output, menu_main_pause) == 0)
         {
-            printf("PAUSING\n");
+            PauseMusic();                
         }
         else if (strcmp(output, menu_main_favourite) == 0)
         {
@@ -213,23 +213,37 @@ void HandleDmenuOutput(const char *output)
 
     else if (menu_curr_state == MENU_STATE_TRACKS)
     {
-        for (int i = 0; 
-             i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length; 
-            ++i)
+        if (strcmp(output, "[.]\n") == 0)
         {
-            char *trck = (db.artists)[
-                menu_curr_artist].albums[menu_curr_album].tracks[i];
-            
-            int output_len = strlen(output);
-            if (strncmp(output, trck, output_len - 1) == 0 
-            && trck[output_len-1] == SIGN_SONG_PATH)
+            for (int i = 0; 
+                i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length; 
+                ++i)
             {
-                printf("CHOSEN: %s\n", trck);
+                char *trck = (db.artists)[menu_curr_artist]
+                    .albums[menu_curr_album].tracks[i];
                 Enqueue(track_queue, strchr(trck, SIGN_SONG_PATH) + 1);
+            }            
+        }
+        else
+        {
+            for (int i = 0; 
+                i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length; 
+                ++i)
+            {
+                char *trck = (db.artists)[
+                    menu_curr_artist].albums[menu_curr_album].tracks[i];
+                
+                int output_len = strlen(output);
+                if (strncmp(output, trck, output_len - 1) == 0 
+                && trck[output_len-1] == SIGN_SONG_PATH)
+                {
+                    printf("CHOSEN: %s\n", trck);
+                    Enqueue(track_queue, strchr(trck, SIGN_SONG_PATH) + 1);
+                }
             }
         }
 
         // Reset menu state to the default.
-        menu_curr_state = MENU_STATE_ARTISTS;
+        menu_curr_state = MENU_STATE_MAIN;
     }
 }

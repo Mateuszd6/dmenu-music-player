@@ -5,6 +5,7 @@
 # and query the current track
 
 VERBOSE=0
+DAEMON_PATH=~/work/dmenu-music-player/dmus-daemon
 # IMPORTANT: They must be the same as variables with the same names,
 #            defined in main.c
 LOCKFILE_DIR=/tmp/dmenu-player-lockfile
@@ -28,7 +29,7 @@ case "$1" in
         if daemon_is_running; then
             # It means player is not working yet. Start it immediately.
             echo "DEBUG: There is no lock, starting daemon..."
-            ~/work/dmenu-music-player/program &
+            $DAEMON_PATH &
         else
             # Player is already running. 
             # Send a message that menu is requested.
@@ -38,6 +39,9 @@ case "$1" in
         ;;
     track)
         echo "TODO: Show current track: (NOTE: formatting is on the way)."
+        ;;
+    state)
+        echo "player-print-queue" > $FIFO_PIPE_DIR
         ;;
     *)
         help_and_exit
