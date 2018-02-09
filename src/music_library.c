@@ -190,7 +190,7 @@ char *ListTracks(struct AlbumInfo albumInfo)
 
 // Make music database and save it to the file. Only called when 
 // previously created 'MUSIC_LIB_FILE_NAME' doesn't exist or is out-of-date.
-void MakeMusicDatbase()
+void MakeMusicDatbase(const char *music_lib_path, const char* new_edit_date)
 {
     // TODO: Instead of guessing its good idea to accualy 
     //       calculate how much memory is needed.
@@ -204,25 +204,11 @@ void MakeMusicDatbase()
 
     qsort(arr, idx, sizeof(char **), CompareMusicData);
 
-    char music_lib_path[256];
-    music_lib_path[0] = '\0';
-    strcat(strcat(strcat(
-        music_lib_path, MUSIC_DATABASE_DIR), "/"), MUSIC_LIB_FILE_NAME);
-    
     FILE *infile = fopen(music_lib_path, "w");
-    
-    char output_buffer[25];
-    char command_buffer[256];
-    sprintf(command_buffer, 
-        "find %s -type f -exec stat \\{} --printf=\"%cy\\n\" \\; | sort -n -r | head -n 1",
-        music_lib_path,
-        '%');
-    GetSystemCommandOneLineOutput(command_buffer, output_buffer, 20);
-    strcat(output_buffer, "\n");
 
     // The first line is basically the info about last change in Music directory
     // when this file was created.
-    fprintf(infile, output_buffer);
+    fprintf(infile, new_edit_date);
 
     char *current_artist = NULL;
     char *current_album = NULL;
@@ -278,9 +264,6 @@ void MakeMusicDatbase()
 
 struct MusicDatabase CreateMusicDB()
 {
-    // TODO: For now make it every time.
-    MakeMusicDatbase();
-
     struct MusicDatabase res;
 
     FILE *music_db = fopen(MUSIC_LIB_FILE_NAME, "r");
@@ -288,14 +271,49 @@ struct MusicDatabase CreateMusicDB()
     ssize_t nread;
     size_t len; 
 
+    char music_lib_path[256];
+    music_lib_path[0] = '\0';
+    strcat(strcat(strcat(
+        music_lib_path, MUSIC_DATABASE_DIR), "/"), MUSIC_LIB_FILE_NAME);    
+
+    // NOTE: Skip the first line because it contains date of last edit.
+    nread = getline(&line, &len, music_db);
+    if (nread == -1)
+    {
+        printf("MUSIC DATA IS EMPTY!\n");
+        res.artists = NULL;
+        res.length = 0;
+        return res;
+    }
+
+    char command_buffer[128];
+    char output_buffer[25];
+
+    sprintf(command_buffer, 
+        "find %s -type f -exec stat \\{} --printf=\"%cy\\n\" \\; | sort -n -r | head -n 1",
+        music_lib_path,
+        '%');
+    GetSystemCommandOneLineOutput(command_buffer, output_buffer, 20);
+    strcat(output_buffer, "\n");
+
+    if (strcmp(output_buffer, line) == 0)
+        fseek(music_db, 0, SEEK_SET);
+    else    
+    {
+        fseek(music_db, 0, SEEK_SET);
+        MakeMusicDatbase(music_lib_path, output_buffer);
+    }
+
     int artists[256];
     int albums[512];
 
     int cur_artist = -1;
     int cur_album = -1;
 
-    // NOTE: Skip the first line because it contains date of last edit.
+    // Skip again.
     nread = getline(&line, &len, music_db);
+    // It is possible that nread is -1 in this case. It means that music database
+    // has beed updated and now is empty. 
     if (nread == -1)
     {
         printf("MUSIC DATA IS EMPTY!\n");
