@@ -41,8 +41,9 @@ void PauseMusic()
     BASS_ChannelPause(channel);    
 }
 
-int LoadAndPlayMusic(char *file_path)
+int LoadAndPlayMusic(char *file_path, char *external_command)
 {   
+    system(external_command);
     BASS_ChannelStop(channel);
     // Load and play the file.
     unsigned int sample = BASS_SampleLoad(

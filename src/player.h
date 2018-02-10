@@ -23,8 +23,9 @@ int InitPlayer();
 
 int PlayerIsBusy();
 
-// Play music on the given path.
-int LoadAndPlayMusic(char *file_path);
+// Play music on the given path. If external_command is not NULL
+// execute it first.
+int LoadAndPlayMusic(char *file_path, char *external_command);
 
 // Make a cleanup.
 void CleanPlayer();
