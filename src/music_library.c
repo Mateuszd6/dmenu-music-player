@@ -348,7 +348,7 @@ struct MusicDatabase CreateMusicDB()
     fseek(music_db, 0, SEEK_SET);
 
     struct ArtistInfo *db = malloc((cur_artist+1) * sizeof(struct ArtistInfo));    
-
+ 
     cur_artist = -1;
     cur_album = -1;
     int idx_of_album = -1;

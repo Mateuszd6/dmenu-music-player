@@ -16,6 +16,10 @@
 #include "menu.h"
 #include "player.h"
 
+const char *SET_MUSIC_DIR_FLAG = "--music-dir";
+const char *SET_MUSIC_DB_DIR_FLAG = "--music-database-dir";
+
+// TODO: Let user specify them too?
 const char *LOCKFILE_DIR = "/tmp/dmenu-player-lockfile";
 const char *FIFO_PIPE_DIR = "/tmp/dmenu-player-pipe";
 
@@ -104,8 +108,30 @@ void ProcessMessage(int fd, char *buffer)
     }
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    for (int i = 1; i < argc; ++i)
+    {
+        if (strncmp(
+            argv[i], SET_MUSIC_DIR_FLAG, strlen(SET_MUSIC_DIR_FLAG) - 1) == 0)
+        {
+            char *value = strchr(argv[i], '=');
+            if (value == NULL) return 255; // TODO: Handle this case better?
+            value++;
+            MUSIC_DIR = value; 
+        }
+        else if (strncmp(
+            argv[i], SET_MUSIC_DB_DIR_FLAG, strlen(SET_MUSIC_DB_DIR_FLAG) - 1) == 0)
+        {
+            char *value = strchr(argv[i], '=');
+            if (value == NULL) return 255; // TODO: Handle this case better?
+            value++;
+            MUSIC_DATABASE_DIR = value; 
+        }
+        else
+            printf("Unrecognized parameter: %s\n", argv[i]);
+    }
+
     // TODO: Specify lock_file dir? Or use relative path?
     int lock_file = open(LOCKFILE_DIR, O_CREAT | O_WRONLY);
 

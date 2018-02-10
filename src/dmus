@@ -4,12 +4,14 @@
 # command it can start menu, restart player, display the queue, 
 # and query the current track
 
-VERBOSE=0
-DAEMON_PATH=~/work/dmenu-music-player/dmus-daemon
 # IMPORTANT: They must be the same as variables with the same names,
 #            defined in main.c
 LOCKFILE_DIR=/tmp/dmenu-player-lockfile
 FIFO_PIPE_DIR=/tmp/dmenu-player-pipe
+
+MUSIC_DIR_PATH=$HOME/Music
+MUSIC_DB_DIR_PATH=$HOME/work/dmenu-music-player
+DAEMON_PATH=$HOME/work/dmenu-music-player
 
 help_and_exit () {
     echo "TODO: SHOW HELP!"
@@ -29,7 +31,7 @@ case "$1" in
         if daemon_is_running; then
             # It means player is not working yet. Start it immediately.
             echo "DEBUG: There is no lock, starting daemon..."
-            $DAEMON_PATH &
+            $DAEMON_PATH/dmus-daemon --music-dir=$MUSIC_DIR_PATH --music-database-dir=$MUSIC_DB_DIR_PATH&
         else
             # Player is already running. 
             # Send a message that menu is requested.
