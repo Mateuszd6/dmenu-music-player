@@ -266,15 +266,15 @@ struct MusicDatabase CreateMusicDB()
 {
     struct MusicDatabase res;
 
-    FILE *music_db = fopen(MUSIC_LIB_FILE_NAME, "ab+");
-    char *line = malloc(256 * sizeof(char));
-    ssize_t nread;
-    size_t len; 
-
     char music_lib_path[256];
     music_lib_path[0] = '\0';
     strcat(strcat(strcat(
         music_lib_path, MUSIC_DATABASE_DIR), "/"), MUSIC_LIB_FILE_NAME);    
+
+    FILE *music_db = fopen(music_lib_path, "ab+");
+    char *line = malloc(256 * sizeof(char));
+    ssize_t nread;
+    size_t len; 
 
     // NOTE: Skip the first line because it contains date of last edit.
     nread = getline(&line, &len, music_db);
