@@ -266,7 +266,7 @@ struct MusicDatabase CreateMusicDB()
 {
     struct MusicDatabase res;
 
-    FILE *music_db = fopen(MUSIC_LIB_FILE_NAME, "r");
+    FILE *music_db = fopen(MUSIC_LIB_FILE_NAME, "ab+");
     char *line = malloc(256 * sizeof(char));
     ssize_t nread;
     size_t len; 
@@ -278,13 +278,6 @@ struct MusicDatabase CreateMusicDB()
 
     // NOTE: Skip the first line because it contains date of last edit.
     nread = getline(&line, &len, music_db);
-    if (nread == -1)
-    {
-        printf("MUSIC DATA IS EMPTY!\n");
-        res.artists = NULL;
-        res.length = 0;
-        return res;
-    }
 
     char command_buffer[128];
     char output_buffer[25];
@@ -296,7 +289,9 @@ struct MusicDatabase CreateMusicDB()
     GetSystemCommandOneLineOutput(command_buffer, output_buffer, 20);
     strcat(output_buffer, "\n");
 
-    if (strcmp(output_buffer, line) == 0)
+    // If there is a first line in the music database (it is not empty),
+    // and it is up-to-date just move to the start of the file.
+    if (nread != 0 && strcmp(output_buffer, line) == 0)
         fseek(music_db, 0, SEEK_SET);
     else    
     {
