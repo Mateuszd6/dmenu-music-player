@@ -142,7 +142,6 @@ int main(int argc, char **argv)
             else
             {
                 printf("No scrpit to execute on song load.\n");
-                getchar();
             }
         }
         else

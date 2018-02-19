@@ -34,6 +34,9 @@ for i in "$@"; do
         --update-music-info-scirpt=*)
             UPDATE_MUSIC_INFO_SCRIPT="${i#*=}"
         ;;
+        --executable-dir=*)
+            DAEMON_PATH="${i#*=}"
+        ;;
         *)
             help_and_exit
         ;;
