@@ -121,7 +121,6 @@ void CallMenu()
     {
         // TODO: Or mayby terminate former menu and call new one?
         printf("MENU_IS_ALREADY_RUNNING!\n");
-        return;
     }
 
     pthread_create(&menu_thread, NULL, StartMenuThread, NULL);

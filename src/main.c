@@ -15,12 +15,12 @@
 #include "music_library.h"
 #include "menu.h"
 #include "player.h"
+#include "misc.h"
 
 const char *SET_MUSIC_DIR_FLAG = "--music-dir";
 const char *SET_MUSIC_DB_DIR_FLAG = "--music-database-dir";
 const char *UPDATE_MUSIC_INFO_COMMAND_FLAG = "--update-music-info-scirpt";
 
-char *UPDATE_MUSIC_SCRIPT=NULL;
 
 // TODO: Let user specify them too?
 const char *LOCKFILE_DIR = "/tmp/dmenu-player-lockfile";
@@ -113,6 +113,7 @@ void ProcessMessage(int fd, char *buffer)
 
 int main(int argc, char **argv)
 {
+    system("pwd > ~/my_pwd");
     for (int i = 1; i < argc; ++i)
     {
         if (strncmp(argv[i], SET_MUSIC_DIR_FLAG, 
@@ -130,8 +131,11 @@ int main(int argc, char **argv)
             if (value == NULL) return 255; // TODO: Handle this case better?
             value++;
             MUSIC_DATABASE_DIR = value; 
+            CURRENT_TRACK_INFO_PATH=malloc(256 * sizeof(char));
+            CURRENT_TRACK_INFO_PATH[0] = '\0';
+            strcat(strcat(CURRENT_TRACK_INFO_PATH, value), "/track-info");
         }
-        else if (strncmp(argv[i], UPDATE_MUSIC_INFO_COMMAND_FLAG, 
+        else if (strncmp(argv[i], UPDATE_MUSIC_INFO_COMMAND_FLAG,
             strlen(UPDATE_MUSIC_INFO_COMMAND_FLAG)-1) == 0)
         {
             char *value = strchr(argv[i], '=');
@@ -172,9 +176,7 @@ int main(int argc, char **argv)
     if (!InitPipe(& fd))
         return -1;
 
-    // TODO: TEMP!
-    Enqueue(track_queue, "/home/mateusz/Music/guitar.mp3");
-    player_is_paused = 0;
+    player_is_paused = 1;
 
     menu_curr_state = MENU_STATE_MAIN;
     CallMenu();
@@ -200,16 +202,8 @@ int main(int argc, char **argv)
                     char **music_data = NULL;
                     if (Peek(track_queue, &music_data) == 0)
                     {
-                        LoadAndPlayMusic(music_data[DATA_FILE_PATH], UPDATE_MUSIC_SCRIPT);                    
-                        printf("Playing:\n");
-                        if (music_data[DATA_TITLE] != NULL)
-                            printf("Title: %s\n", music_data[DATA_TITLE]);
-                        if (music_data[DATA_ARTIST] != NULL) 
-                            printf("Artist: %s\n", music_data[DATA_ARTIST]);    
-                        if  (music_data[DATA_ALBUM_TITLE] != NULL)
-                            printf("Album: %s\n", music_data[DATA_ALBUM_TITLE]);            
-                        if  (music_data[DATA_YEAR] != NULL)
-                            printf("Year: %s\n", music_data[DATA_YEAR]);
+                        UpdateTrackData(music_data);
+                        LoadAndPlayMusic(music_data[DATA_FILE_PATH]);
                     }
                     music_data = NULL;
 
@@ -220,9 +214,15 @@ int main(int argc, char **argv)
     }
 
     // Cleanup.
+
+    // Remove track-info file and update the script.
+    unlink(CURRENT_TRACK_INFO_PATH);
+    if (UPDATE_MUSIC_SCRIPT)
+        system(UPDATE_MUSIC_SCRIPT);
+
     close(fd);    
     CleanPlayer();
-    
+
     if (flock(lock_file, LOCK_UN) != 0)
     {
         printf("Error, could not realese the lock file.\n");

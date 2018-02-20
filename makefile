@@ -39,3 +39,7 @@ make-alias:
 	@echo "which can be placed anywhere You want."
 	@echo "Unless You move something other than this script"
 	@echo "from this directory this should always work."
+	@echo ""
+	@echo "Please note that you might also want to tweak created script"
+	@echo "to adjust a script used to update info about current song"
+	@echo "in your system."

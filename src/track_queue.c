@@ -4,6 +4,7 @@
 
 #include "track_queue.h"
 #include "music_data.h"
+#include "player.h"
 
 struct Queue *track_queue;
 
@@ -69,6 +70,9 @@ void Enqueue (struct Queue *queue, char *value)
         queue->tail->next = last;
         queue->tail = last;
     }
+
+    if (player_is_paused)
+        UnpauseMusic();
 }
 
 void Dequeue (struct Queue *queue)

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# This is a frontend script to the player. Recieving different 
-# command it can start menu, restart player, display the queue, 
+# This is a frontend script to the player. Recieving different
+# command it can start menu, restart player, display the queue,
 # and query the current track
 
-# IMPORTANT: They must be the same as variables with the same names, 
+# IMPORTANT: They must be the same as variables with the same names,
 #            defined in main.c
 LOCKFILE_DIR=/tmp/dmenu-player-lockfile
 FIFO_PIPE_DIR=/tmp/dmenu-player-pipe
@@ -19,12 +19,16 @@ help_and_exit () {
     exit 1
 }
 
-daemon_is_running () {
+daemon_is_not_running () {
     [ -z "`lslocks | grep $LOCKFILE_DIR`" ]
 }
 
+player_is_paused () {
+    [ `head -n 1 $DAEMON_PATH/track-info` = 0 ]
+}
+
 for i in "$@"; do
-    case $i in 
+    case $i in
         --music-dir=*)
             MUSIC_DIR_PATH="${i#*=}"
         ;;
@@ -37,18 +41,51 @@ for i in "$@"; do
         --executable-dir=*)
             DAEMON_PATH="${i#*=}"
         ;;
+        --query-is-daemon-alive)
+            if daemon_is_not_running; then
+                echo "n"
+            else
+                echo "y"
+            fi
+            exit 0
+        ;;
+        --query-is-paused)
+            if player_is_paused; then
+                echo "y"
+            else
+                echo "n"
+            fi
+            exit 0
+        ;;
+        --query-title)
+            tail -n+2 $DAEMON_PATH/track-info | head -n1
+            exit 0
+        ;;
+        --query-artist)
+            tail -n+3 $DAEMON_PATH/track-info | head -n1
+            exit 0
+        ;;
+        --query-track)
+            tail -n+4 $DAEMON_PATH/track-info | head -n1
+            exit 0
+        ;;
+        --query-year)
+            tail -n+5 $DAEMON_PATH/track-info | head -n1
+            exit 0
+        ;;
         *)
+            echo "Unrecognized parameter: " $i
             help_and_exit
         ;;
     esac
 done
 
-if daemon_is_running; then
+if daemon_is_not_running; then
     # It means player is not working yet. Start it immediately.
     echo "DEBUG: There is no lock, starting daemon..."
     $DAEMON_PATH/dmus-daemon --music-dir=$MUSIC_DIR_PATH --music-database-dir=$MUSIC_DB_DIR_PATH --update-music-info-scirpt=$UPDATE_MUSIC_INFO_SCRIPT&
 else
-    # Player is already running. 
+    # Player is already running.
     # Send a message that menu is requested.
     echo "DEBUG: There is lock."
     echo "menu-show" > $FIFO_PIPE_DIR
