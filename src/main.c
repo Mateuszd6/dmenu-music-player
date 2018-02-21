@@ -153,14 +153,22 @@ int main(int argc, char **argv)
     }
 
     // TODO: Specify lock_file dir? Or use relative path?
-    int lock_file = open(LOCKFILE_DIR, O_CREAT | O_WRONLY);
+    int lock_file = open(LOCKFILE_DIR, O_CREAT | O_WRONLY, 
+        // TODO: Setting these flags ends proglem with a lockfile. 
+        //       But are they all necesary?
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 
     // TODO: Should the music player be able to run without lockfile?
-    if (lock_file == -1 || flock(lock_file, LOCK_EX | LOCK_NB) != 0) 
+    if (lock_file == -1) 
     {
         printf("Error opening lock file. Exitting...");
         return 255;
     }    
+    else if (flock(lock_file, LOCK_EX | LOCK_NB) != 0)
+    {
+        printf("Error locking file. Exitting...");
+        return 255;
+    }
 
     if (InitPlayer() != 0) return -1;
 
