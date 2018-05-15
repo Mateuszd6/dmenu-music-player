@@ -10,10 +10,8 @@
 #include "player.h"
 #include "menu.h"
 
-// These are used to call dmenu command. 
+// These are used to call dmenu command.
 // TODO: Let user modify the command with which dmenu is called?
-const char *prefix = "echo -e \"";
-const char *suffix = "\" | dmenu -i";
 
 // These are commands used to create main menu msg.
 const char *menu_main_queue     = "[Queue]\n";
@@ -22,6 +20,8 @@ const char *menu_main_next      = "[Next]\n";
 // TODO: Making them const results with a warning:
 char *menu_main_pause           = "[Pause]\n";
 char *menu_main_play            = "[Play]\n";
+
+char *dmenu_command = "dmenu -i";
 
 // This is a thread which is called when menu is shown.
 // Menu is handed separately, because it cannot block playing the music.
@@ -36,21 +36,21 @@ char *MakeMainMenu()
 {
     int pause_len = strlen(menu_main_pause);
     int play_len = strlen(menu_main_play);
-    
-    int msg_len = (pause_len > play_len ? pause_len : play_len) 
-        + strlen(menu_main_queue) 
-        + strlen(menu_main_quit) 
+
+    int msg_len = (pause_len > play_len ? pause_len : play_len)
+        + strlen(menu_main_queue)
+        + strlen(menu_main_quit)
         + strlen(menu_main_next)
         + 1;
 
     char *res = malloc(msg_len * sizeof(char));
     res[0] = '\0';
-    
+
     char *play_toggle = player_is_paused ? menu_main_play : menu_main_pause;
     strcat(strcat(strcat(strcat(
-        res, play_toggle), menu_main_next), menu_main_queue), menu_main_quit);    
-    
-    // It's because final msg cannot have '\n' on its end or there will be a 
+        res, play_toggle), menu_main_next), menu_main_queue), menu_main_quit);
+
+    // It's because final msg cannot have '\n' on its end or there will be a
     // empty option in the dmenu.
     res[msg_len-2] = '\0';
 
@@ -69,7 +69,7 @@ void ShowMenu()
     if (menu_curr_state == MENU_STATE_MAIN)
         msg_content = MakeMainMenu();
     else if (menu_curr_state == MENU_STATE_ARTISTS)
-        msg_content = ListArtists();        
+        msg_content = ListArtists();
     else if (menu_curr_state == MENU_STATE_ALBUMS)
         msg_content = ListAlbums((db.artists)[menu_curr_artist]);
     else if (menu_curr_state == MENU_STATE_TRACKS)
@@ -80,6 +80,12 @@ void ShowMenu()
         printf("Unexpected menu state: %d\n", menu_curr_state);
         return;
     }
+
+    char suffix[strlen("\" | ") + strlen(dmenu_command) + 1];
+    suffix[0] = '\0';
+    strcat(strcat(suffix, "\" | "), dmenu_command);
+
+    const char *prefix = "echo -e \"";
 
     PrintToBufferAtIndex(buf, prefix, &buf_idx);
     PrintToBufferAtIndex(buf, msg_content, &buf_idx);
@@ -105,7 +111,7 @@ void *StartMenuThread(void *args)
 {
     menu_is_running = 1;
 
-    // Silent a warning about [args] being not used.  
+    // Silent a warning about [args] being not used.
     if (args) {}
 
     ShowMenu();
@@ -133,24 +139,24 @@ void HandleDmenuOutput(const char *output)
     if (menu_curr_state == MENU_STATE_MAIN)
     {
         if (strcmp(output, menu_main_play) == 0)
-        {        
+        {
             UnpauseMusic();
         }
         else if (strcmp(output, menu_main_pause) == 0)
         {
-            PauseMusic();                
+            PauseMusic();
         }
         else if (strcmp(output, menu_main_queue) == 0)
         {
             menu_curr_state = MENU_STATE_ARTISTS;
-            ShowMenu();    
+            ShowMenu();
         }
         else if (strcmp(output, menu_main_quit) == 0)
         {
             force_quit = 1;
             printf("QUITTING!\n");
         }
-    }    
+    }
 
     else if (menu_curr_state == MENU_STATE_ARTISTS)
     {
@@ -158,13 +164,13 @@ void HandleDmenuOutput(const char *output)
         for (int i = 0; i < db.length; ++i)
         {
             printf("%d: %s\n", i, (db.artists)[i].name);
-            if (strncmp((db.artists)[i].name, output, 
+            if (strncmp((db.artists)[i].name, output,
                 strlen((db.artists)[i].name)) == 0)
             {
                 menu_curr_artist = i;
                 break;
             }
-        }        
+        }
         if (menu_curr_artist >= 0)
         {
             menu_curr_state = MENU_STATE_ALBUMS;
@@ -178,18 +184,18 @@ void HandleDmenuOutput(const char *output)
     }
 
     else if (menu_curr_state == MENU_STATE_ALBUMS)
-    {        
+    {
         menu_curr_album = -1;
         for (int i = 0; i < (db.artists)[menu_curr_artist].length; ++i)
         {
             printf("%d: %s\n",i,(db.artists)[menu_curr_artist].albums[i].title);
-            if (strncmp((db.artists)[menu_curr_artist].albums[i].title, output, 
+            if (strncmp((db.artists)[menu_curr_artist].albums[i].title, output,
                 strlen((db.artists)[menu_curr_artist].albums[i].title)) == 0)
             {
                 menu_curr_album = i;
                 break;
             }
-        }        
+        }
         if (menu_curr_album >= 0)
         {
             menu_curr_state = MENU_STATE_TRACKS;
@@ -206,26 +212,26 @@ void HandleDmenuOutput(const char *output)
     {
         if (strcmp(output, "[.]\n") == 0)
         {
-            for (int i = 0; 
-                i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length; 
+            for (int i = 0;
+                i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length;
                 ++i)
             {
                 char *trck = (db.artists)[menu_curr_artist]
                     .albums[menu_curr_album].tracks[i];
                 Enqueue(track_queue, strchr(trck, SIGN_SONG_PATH) + 1);
-            }            
+            }
         }
         else
         {
-            for (int i = 0; 
-                i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length; 
+            for (int i = 0;
+                i < (db.artists)[menu_curr_artist].albums[menu_curr_album].length;
                 ++i)
             {
                 char *trck = (db.artists)[
                     menu_curr_artist].albums[menu_curr_album].tracks[i];
-                
+
                 int output_len = strlen(output);
-                if (strncmp(output, trck, output_len - 1) == 0 
+                if (strncmp(output, trck, output_len - 1) == 0
                 && trck[output_len-1] == SIGN_SONG_PATH)
                 {
                     printf("CHOSEN: %s\n", trck);

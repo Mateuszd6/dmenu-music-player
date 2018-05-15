@@ -12,6 +12,7 @@ FIFO_PIPE_DIR=/tmp/dmenu-player-pipe
 MUSIC_DIR_PATH=$HOME/Music
 MUSIC_DB_DIR_PATH=$HOME/work/dmenu-music-player
 DAEMON_PATH=$HOME/work/dmenu-music-player
+DMENU_COMMAND="dmenu -i"
 UPDATE_MUSIC_INFO_SCRIPT=""
 
 help_and_exit () {
@@ -40,6 +41,9 @@ for i in "$@"; do
         ;;
         --executable-dir=*)
             DAEMON_PATH="${i#*=}"
+        ;;
+        --dmenu-command=*)
+            DMENU_COMMAND="${i#*=}"
         ;;
         --query-is-daemon-alive)
             if daemon_is_not_running; then
@@ -82,8 +86,10 @@ done
 
 if daemon_is_not_running; then
     # It means player is not working yet. Start it immediately.
-    echo "DEBUG: There is no lock, starting daemon..."
-    $DAEMON_PATH/dmus-daemon --music-dir=$MUSIC_DIR_PATH --music-database-dir=$MUSIC_DB_DIR_PATH --update-music-info-scirpt=$UPDATE_MUSIC_INFO_SCRIPT&
+    echo -e "DEBUG: There is no lock, starting daemon...\n"
+    echo -e "DEBUG: DMENU COMMAND: $DMENU_COMMAND\n"
+
+    $DAEMON_PATH/dmus-daemon --music-dir=$MUSIC_DIR_PATH --music-database-dir=$MUSIC_DB_DIR_PATH --dmenu-command=$DMENU_COMMAND --update-music-info-scirpt=$UPDATE_MUSIC_INFO_SCRIPT &
 else
     # Player is already running.
     # Send a message that menu is requested.

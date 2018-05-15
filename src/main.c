@@ -20,7 +20,7 @@
 const char *SET_MUSIC_DIR_FLAG = "--music-dir";
 const char *SET_MUSIC_DB_DIR_FLAG = "--music-database-dir";
 const char *UPDATE_MUSIC_INFO_COMMAND_FLAG = "--update-music-info-scirpt";
-
+const char *DMENU_COMMAND_FLAG = "--dmenu-command";
 
 // TODO: Let user specify them too?
 const char *LOCKFILE_DIR = "/tmp/dmenu-player-lockfile";
@@ -29,7 +29,7 @@ const char *FIFO_PIPE_DIR = "/tmp/dmenu-player-pipe";
 int InitPipe(int *fd)
 {
     // If this file already exist delete it first.
-    if(access(FIFO_PIPE_DIR, F_OK) != -1) 
+    if(access(FIFO_PIPE_DIR, F_OK) != -1)
     {
         // TODO: Handle the case when program cannot remove this file.
         unlink(FIFO_PIPE_DIR);
@@ -87,7 +87,7 @@ void ProcessMessage(int fd, char *buffer)
         //       the deamons output, not the bash script, who has called it.
         else if (strncmp(buffer, "player-print-queue\n", read_res) == 0)
         {
-            PrintQueue(track_queue); 
+            PrintQueue(track_queue);
         }
         // TODO: Call dmenu via bash or shortcut.
         else if (strncmp(buffer, "menu-show\n", read_res) == 0)
@@ -116,27 +116,27 @@ int main(int argc, char **argv)
     system("pwd > ~/my_pwd");
     for (int i = 1; i < argc; ++i)
     {
-        if (strncmp(argv[i], SET_MUSIC_DIR_FLAG, 
-            strlen(SET_MUSIC_DIR_FLAG)-1) == 0)
+        if (strncmp(argv[i], SET_MUSIC_DIR_FLAG,
+                    strlen(SET_MUSIC_DIR_FLAG)-1) == 0)
         {
             char *value = strchr(argv[i], '=');
             if (value == NULL) return 255; // TODO: Handle this case better?
             value++;
-            MUSIC_DIR = value; 
+            MUSIC_DIR = value;
         }
-        else if (strncmp(argv[i], SET_MUSIC_DB_DIR_FLAG, 
-            strlen(SET_MUSIC_DB_DIR_FLAG)-1) == 0)
+        else if (strncmp(argv[i], SET_MUSIC_DB_DIR_FLAG,
+                         strlen(SET_MUSIC_DB_DIR_FLAG)-1) == 0)
         {
             char *value = strchr(argv[i], '=');
             if (value == NULL) return 255; // TODO: Handle this case better?
             value++;
-            MUSIC_DATABASE_DIR = value; 
+            MUSIC_DATABASE_DIR = value;
             CURRENT_TRACK_INFO_PATH=malloc(256 * sizeof(char));
             CURRENT_TRACK_INFO_PATH[0] = '\0';
             strcat(strcat(CURRENT_TRACK_INFO_PATH, value), "/track-info");
         }
         else if (strncmp(argv[i], UPDATE_MUSIC_INFO_COMMAND_FLAG,
-            strlen(UPDATE_MUSIC_INFO_COMMAND_FLAG)-1) == 0)
+                         strlen(UPDATE_MUSIC_INFO_COMMAND_FLAG)-1) == 0)
         {
             char *value = strchr(argv[i], '=');
             if (value == NULL) return 255; // TODO: Handle this case better?
@@ -148,22 +148,35 @@ int main(int argc, char **argv)
                 printf("No scrpit to execute on song load.\n");
             }
         }
+        else if (strncmp(argv[i], DMENU_COMMAND_FLAG,
+                         strlen(DMENU_COMMAND_FLAG)-1) == 0)
+        {
+#if 0
+#include <assert.h>
+            assert(0);
+#endif
+            char *value = strchr(argv[i], '=');
+            if (value == NULL) return 255; // TODO: Handle this case better?
+            value++;
+            if (strcmp(value, "") != 0)
+                dmenu_command = value;
+        }
         else
             printf("Unrecognized parameter: %s\n", argv[i]);
     }
 
     // TODO: Specify lock_file dir? Or use relative path?
-    int lock_file = open(LOCKFILE_DIR, O_CREAT | O_WRONLY, 
-        // TODO: Setting these flags ends proglem with a lockfile. 
+    int lock_file = open(LOCKFILE_DIR, O_CREAT | O_WRONLY,
+        // TODO: Setting these flags ends proglem with a lockfile.
         //       But are they all necesary?
         S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 
     // TODO: Should the music player be able to run without lockfile?
-    if (lock_file == -1) 
+    if (lock_file == -1)
     {
         printf("Error opening lock file. Exitting...");
         return 255;
-    }    
+    }
     else if (flock(lock_file, LOCK_EX | LOCK_NB) != 0)
     {
         printf("Error locking file. Exitting...");
@@ -174,7 +187,7 @@ int main(int argc, char **argv)
 
     db = CreateMusicDB();
     track_queue = InitializeQueue();
-    
+
     // Handler to a pipe file and buffer for the messages.
     int fd;
 
@@ -228,7 +241,7 @@ int main(int argc, char **argv)
     if (UPDATE_MUSIC_SCRIPT)
         system(UPDATE_MUSIC_SCRIPT);
 
-    close(fd);    
+    close(fd);
     CleanPlayer();
 
     if (flock(lock_file, LOCK_UN) != 0)
